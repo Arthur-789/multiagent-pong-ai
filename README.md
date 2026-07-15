@@ -88,6 +88,10 @@ impressos no terminal a cada 10 episódios.
 python main.py avaliar
 ```
 
+Carrega o modelo treinado e joga várias partidas do agente de RL contra o
+agente heurístico, exibindo ao final as vitórias, a pontuação média e a taxa de
+vitória de cada agente.
+
 ## Como jogar
 
 ```bash
@@ -107,28 +111,22 @@ Controles:
 - `SPACE` serve
 - `ESC` sai
 
-Carrega o modelo treinado e joga várias partidas do agente de RL contra o agente heurístico, exibindo ao final:
+No modo jogável, a execução respeita o limite `FPS_JOGO` definido em
+`config.py`, para que a velocidade não dependa do desempenho da CPU ou do tempo
+de inferência do modelo.
 
-No modo jogável, a execução é limitada à taxa de quadros definida pelo
-ambiente Atari para que a velocidade não dependa do desempenho da CPU ou do
-tempo de inferência do modelo.
+## Como assistir ao modelo
 
+Para visualizar um modelo jogando contra o mesmo oponente usado no treino:
+
+```bash
+python main.py assistir modelo_rl.pt
 ```
-Resultados
-Agente de busca heurística:
-  Vitórias: ...
-Agente de aprendizado por reforço:
-  Vitórias: ...
-Empates: ...
 
-Pontuação média:
-  Heurístico: ...
-  RL: ...
-
-Taxa de vitória:
-  Heurístico: ...
-  RL: ...
-```
+Esse modo não atualiza a rede Q nem executa etapas de treinamento. Cada partida
+vai até o encerramento normal do Pong em 21 pontos, imprime o placar, reinicia
+automaticamente e respeita o limite `FPS_JOGO` definido em `config.py`. Use
+`ESC` para fechar.
 
 Como o placar do Pong não é estritamente de soma zero por causa
 da penalidade de saque demorado, é possível uma partida terminar com

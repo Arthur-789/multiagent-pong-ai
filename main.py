@@ -1,6 +1,7 @@
 # python main.py treinar -> treina o agente de RL
 # python main.py avaliar -> compara os dois agentes
 # python main.py jogar [modelo] -> joga contra o modelo
+# python main.py assistir [modelo] -> exibe o modelo contra o oponente de treino
 
 import sys
 
@@ -8,10 +9,19 @@ from train import treinar
 from evaluate import avaliar
 from config import RENDER_TREINO, RENDER_AVALIACAO
 from jogar import jogar
+from assistir import assistir
 
 def main():
-    if len(sys.argv) < 2 or sys.argv[1] not in ("treinar", "avaliar", "jogar"):
-        print("Uso: python main.py [treinar|avaliar|jogar] [--render] [modelo.pt]")
+    if len(sys.argv) < 2 or sys.argv[1] not in (
+        "treinar",
+        "avaliar",
+        "jogar",
+        "assistir",
+    ):
+        print(
+            "Uso: python main.py [treinar|avaliar|jogar|assistir] "
+            "[--render] [modelo.pt]"
+        )
         return
 
     # A flag --render força a visualização. Sem a flag, usamos o valor
@@ -23,6 +33,8 @@ def main():
         treinar(render=forcar_render or RENDER_TREINO)
     elif sys.argv[1] == "jogar":
         jogar(modelo=modelo)
+    elif sys.argv[1] == "assistir":
+        assistir(modelo=modelo)
     else:
         avaliar(render=forcar_render or RENDER_AVALIACAO)
 

@@ -14,7 +14,7 @@ NOME_MODELO = "first_0"
 INTERVALO_MOVIMENTO_HUMANO = 3
 
 
-def _resolver_modelo(argumento):
+def resolver_modelo(argumento):
     if not argumento:
         return CAMINHO_MODELO
     if os.path.exists(argumento):
@@ -47,7 +47,7 @@ def _ler_acao_humana(permitir_movimento=True):
 
 
 def jogar(modelo=CAMINHO_MODELO):
-    caminho_modelo = _resolver_modelo(modelo)
+    caminho_modelo = resolver_modelo(modelo)
     render_mode = "human"
     env = criar_ambiente(render_mode=render_mode)
 

@@ -1,19 +1,19 @@
-# Treina o agente de RL (Q-Learning com MLP) praticando devolucoes.
+# Treina o agente de Q-learning tabular praticando devolucoes.
 
 import sys
 import random
 import numpy as np
-import torch
 
 from environment import criar_ambiente
 from rl_agent import AgenteRL
-from training_opponent import OponenteTreino
+import heuristic_agent
+from checkpoints import caminho_checkpoint, checkpoint_mais_recente
 from config import (
     TREINO_EPISODIOS,
     EPSILON_INICIAL,
     EPSILON_FINAL,
     EPSILON_DECAIMENTO,
-    CAMINHO_MODELO,
+    DIRETORIO_CHECKPOINTS,
     RENDER_TREINO,
     RECOMPENSA_APROXIMACAO,
     RECOMPENSA_REBATIDA,
@@ -29,24 +29,33 @@ IDX_JOGADOR_Y = 51
 def treinar(render=RENDER_TREINO):
     random.seed(SEED)
     np.random.seed(SEED)
-    torch.manual_seed(SEED)
 
     render_mode = "human" if render else None
     env = criar_ambiente(render_mode=render_mode)
     agente_rl = AgenteRL()
-    oponente_treino = OponenteTreino()
-    agente_rl.epsilon = EPSILON_INICIAL
+    ultimo_checkpoint = checkpoint_mais_recente(DIRETORIO_CHECKPOINTS)
+    if ultimo_checkpoint is None:
+        episodio_inicial = 1
+        agente_rl.epsilon = EPSILON_INICIAL
+    else:
+        ultimo_episodio = agente_rl.carregar(ultimo_checkpoint)
+        episodio_inicial = ultimo_episodio + 1
 
     NOME_RL = "first_0"
     NOME_OPONENTE_TREINO = "second_0"
 
     print("Iniciando treinamento do agente de RL...")
-    print(f"Dispositivo PyTorch: {agente_rl.dispositivo}")
+    print(f"Estados da tabela Q: {agente_rl.tabela_q.shape[0]}")
     print(f"Episódios: {TREINO_EPISODIOS}\n")
+    if ultimo_checkpoint is not None:
+        print(
+            f"Retomando do episódio {ultimo_episodio}, checkpoint "
+            f"'{ultimo_checkpoint}'.\n"
+        )
 
-    for episodio in range(1, TREINO_EPISODIOS + 1):
+    for episodio in range(episodio_inicial, TREINO_EPISODIOS + 1):
         env.reset(seed=SEED + episodio)
-        oponente_treino.resetar()
+        agente_rl.resetar_estado()
         recompensa_total = 0
         total_rebatidas = 0
         pontos_feitos = 0
@@ -62,6 +71,9 @@ def treinar(render=RENDER_TREINO):
             observacao, recompensa, terminou, truncado, _ = env.last()
 
             if agente == NOME_RL:
+                if recompensa != 0:
+                    agente_rl.resetar_estado()
+                estado_rl = agente_rl.extrair_estado(observacao)
                 bola_x = int(observacao[IDX_BOLA_X])
                 bola_y = int(observacao[IDX_BOLA_Y])
                 jogador_y = int(observacao[IDX_JOGADOR_Y])
@@ -109,7 +121,7 @@ def treinar(render=RENDER_TREINO):
                         ultimo_estado_rl[agente],
                         ultima_acao_rl[agente],
                         recompensa_treino,
-                        observacao,
+                        estado_rl,
                         terminou or truncado,
                     )
                 recompensa_total += recompensa_treino
@@ -117,20 +129,24 @@ def treinar(render=RENDER_TREINO):
                 if terminou or truncado:
                     acao = None
                 else:
-                    acao = agente_rl.escolher_acao(observacao, explorar=True)
-                    ultimo_estado_rl[agente] = observacao
+                    acao = agente_rl.escolher_acao(estado_rl, explorar=True)
+                    ultimo_estado_rl[agente] = estado_rl
                     ultima_acao_rl[agente] = acao
 
             elif agente == NOME_OPONENTE_TREINO:
                 if terminou or truncado:
                     acao = None
                 else:
-                    acao = oponente_treino.escolher_acao(observacao, recompensa)
+                    acao = heuristic_agent.escolher_acao(observacao)
 
             env.step(acao)
 
         # Decaimento do epsilon (exploração)
         agente_rl.epsilon = max(EPSILON_FINAL, agente_rl.epsilon * EPSILON_DECAIMENTO)
+        agente_rl.salvar(
+            caminho_checkpoint(DIRETORIO_CHECKPOINTS, episodio),
+            episodio=episodio,
+        )
 
         if episodio % 10 == 0 or episodio == 1:
             print(
@@ -142,8 +158,16 @@ def treinar(render=RENDER_TREINO):
             )
 
     env.close()
-    agente_rl.salvar(CAMINHO_MODELO)
-    print(f"\nTreinamento concluído. Modelo salvo em '{CAMINHO_MODELO}'.")
+    if episodio_inicial > TREINO_EPISODIOS:
+        print(
+            f"Treinamento já concluído até o episódio {ultimo_episodio}. "
+            "Nenhum episódio novo executado."
+        )
+    else:
+        print(
+            "\nTreinamento concluído. Último checkpoint salvo em "
+            f"'{caminho_checkpoint(DIRETORIO_CHECKPOINTS, TREINO_EPISODIOS)}'."
+        )
 
 if __name__ == "__main__":
     treinar(render="--render" in sys.argv)

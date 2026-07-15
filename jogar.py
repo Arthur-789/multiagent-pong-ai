@@ -5,7 +5,8 @@ import sys
 
 import pygame
 
-from config import CAMINHO_MODELO, FPS_JOGO, SEED
+from checkpoints import checkpoint_mais_recente
+from config import CAMINHO_MODELO, DIRETORIO_CHECKPOINTS, FPS_JOGO, SEED
 from environment import criar_ambiente
 from rl_agent import AgenteRL
 
@@ -16,11 +17,11 @@ INTERVALO_MOVIMENTO_HUMANO = 3
 
 def resolver_modelo(argumento):
     if not argumento:
-        return CAMINHO_MODELO
+        return checkpoint_mais_recente(DIRETORIO_CHECKPOINTS) or CAMINHO_MODELO
     if os.path.exists(argumento):
         return argumento
-    if not argumento.endswith(".pt"):
-        candidato = f"{argumento}.pt"
+    if not argumento.endswith(".npz"):
+        candidato = f"{argumento}.npz"
         if os.path.exists(candidato):
             return candidato
     return argumento
@@ -41,12 +42,10 @@ def _ler_acao_humana(permitir_movimento=True):
         return 4
     if permitir_movimento and (teclas[pygame.K_s] or teclas[pygame.K_DOWN]):
         return 5
-    if teclas[pygame.K_SPACE]:
-        return 1
-    return 0
+    return 1
 
 
-def jogar(modelo=CAMINHO_MODELO):
+def jogar(modelo=None):
     caminho_modelo = resolver_modelo(modelo)
     render_mode = "human"
     env = criar_ambiente(render_mode=render_mode)
@@ -55,11 +54,11 @@ def jogar(modelo=CAMINHO_MODELO):
     agente_modelo.carregar(caminho_modelo)
 
     print(f"Jogando contra o modelo: {caminho_modelo}")
-    print(f"Dispositivo PyTorch: {agente_modelo.dispositivo}")
-    print("Controles: W/↑ sobe, S/↓ desce, SPACE serve, ESC sai.")
+    print("Controles: W/↑ sobe, S/↓ desce, saque automático, ESC sai.")
 
     try:
         env.reset(seed=SEED)
+        agente_modelo.resetar_estado()
         env.render()
         relogio = pygame.time.Clock()
         fps = FPS_JOGO
@@ -87,6 +86,7 @@ def jogar(modelo=CAMINHO_MODELO):
                     relogio.tick(fps)
 
             env.reset()
+            agente_modelo.resetar_estado()
             env.render()
             passos_humano = 0
     except KeyboardInterrupt:
@@ -96,4 +96,4 @@ def jogar(modelo=CAMINHO_MODELO):
 
 
 if __name__ == "__main__":
-    jogar(sys.argv[1] if len(sys.argv) > 1 else CAMINHO_MODELO)
+    jogar(sys.argv[1] if len(sys.argv) > 1 else None)

@@ -4,11 +4,11 @@ import sys
 
 import pygame
 
-from config import CAMINHO_MODELO, FPS_JOGO, SEED
+from config import FPS_JOGO, SEED
 from environment import criar_ambiente
 from jogar import resolver_modelo
 from rl_agent import AgenteRL
-from training_opponent import OponenteTreino
+import heuristic_agent
 
 NOME_MODELO = "first_0"
 NOME_OPONENTE = "second_0"
@@ -22,23 +22,21 @@ def _verificar_saida():
         raise KeyboardInterrupt
 
 
-def assistir(modelo=CAMINHO_MODELO):
+def assistir(modelo=None):
     caminho_modelo = resolver_modelo(modelo)
     env = criar_ambiente(render_mode="human")
     agente_modelo = AgenteRL()
     agente_modelo.carregar(caminho_modelo)
-    oponente_treino = OponenteTreino()
     relogio = pygame.time.Clock()
 
     print(f"Modelo contra oponente de treino: {caminho_modelo}")
-    print(f"Dispositivo PyTorch: {agente_modelo.dispositivo}")
     print(f"Limite: {FPS_JOGO} FPS. Pressione ESC para sair.")
 
     partida = 1
     try:
         while True:
             env.reset(seed=SEED if partida == 1 else None)
-            oponente_treino.resetar()
+            agente_modelo.resetar_estado()
             placar = {NOME_MODELO: 0, NOME_OPONENTE: 0}
 
             for agente in env.agent_iter():
@@ -50,7 +48,7 @@ def assistir(modelo=CAMINHO_MODELO):
                 elif agente == NOME_MODELO:
                     acao = agente_modelo.escolher_acao(observacao, explorar=False)
                 else:
-                    acao = oponente_treino.escolher_acao(observacao, recompensa)
+                    acao = heuristic_agent.escolher_acao(observacao)
 
                 env.step(acao)
                 if agente == NOME_OPONENTE:
@@ -69,4 +67,4 @@ def assistir(modelo=CAMINHO_MODELO):
 
 
 if __name__ == "__main__":
-    assistir(sys.argv[1] if len(sys.argv) > 1 else CAMINHO_MODELO)
+    assistir(sys.argv[1] if len(sys.argv) > 1 else None)

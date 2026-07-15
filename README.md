@@ -9,9 +9,8 @@ O objetivo não é obter o melhor agente possível, mas sim comparar:
 
 1. **Agente de busca heurística** — decide ações com base em
    estado, objetivo e regras de alinhamento com a bola.
-2. **Agente de aprendizado por reforço (Q-Learning + MLP)** — aprende
-   a jogar através de tentativa e erro, aproximando a função Q com
-   uma rede neural simples (MLP).
+2. **Agente de aprendizado por reforço (Q-Learning tabular)** — aprende
+   a jogar por tentativa e erro, atualizando diretamente uma tabela Q.
 
 ## Sobre o jogo
 
@@ -60,12 +59,7 @@ AutoROM --accept-license
 - `Python`
 - `pettingzoo[atari]` - ambiente multiagente Atari
 - `autorom` - baixa as ROMs do Atari automaticamente
-- `torch` - implementação da MLP usada como aproximador de Q
-- `numpy` - manipulação de vetores
-
-As redes e os tensores usam CUDA automaticamente quando uma GPU compatível e
-uma instalação do PyTorch com suporte a CUDA estão disponíveis. Caso contrário,
-o projeto continua usando a CPU.
+- `numpy` - tabela Q, discretização e checkpoints
 
 ## Como treinar
 
@@ -73,14 +67,17 @@ o projeto continua usando a CPU.
 python main.py treinar
 ```
 
-Isso treina o agente de RL contra um adversário controlado que antecipa a
-trajetória da bola e tenta devolvê-la continuamente. O RL recebe recompensa
+Isso treina o agente de RL contra o mesmo agente heurístico usado na avaliação,
+que move a raquete para reduzir a distância vertical até a bola. O RL recebe recompensa
 por aproximar a raquete enquanto a bola vem, recompensa imediata ao rebater,
 uma recompensa muito maior ao marcar e uma punição forte ao sofrer um ponto.
 Pontos sem uma rebatida anterior não geram recompensa gratuita. Os valores
-ficam em `config.py`. Ao final, o modelo
-treinado é salvo em `modelo_rl.pt`. O progresso e o número de rebatidas são
-impressos no terminal a cada 10 episódios.
+ficam em `config.py`. Ao final de cada episódio, um checkpoint é salvo em
+`checkpoints_tabular/qtable_episodio_XXXXXX.npz`. A gravação é atômica: um arquivo
+temporário é concluído antes de substituir o destino. Ao aumentar
+`TREINO_EPISODIOS`, o treino retoma automaticamente o checkpoint de maior
+número. O progresso e o número de rebatidas são impressos no terminal a cada
+10 episódios.
 
 ## Como avaliar
 
@@ -95,35 +92,34 @@ vitória de cada agente.
 ## Como jogar
 
 ```bash
-python main.py jogar modelo_rl.pt
+python main.py jogar
 ```
 
 Ou diretamente:
 
 ```bash
-python jogar.py modelo_rl.pt
+python jogar.py
 ```
 
 Controles:
 
 - `W` ou `↑` sobe
 - `S` ou `↓` desce
-- `SPACE` serve
+- o saque é automático
 - `ESC` sai
 
 No modo jogável, a execução respeita o limite `FPS_JOGO` definido em
-`config.py`, para que a velocidade não dependa do desempenho da CPU ou do tempo
-de inferência do modelo.
+`config.py`, para que a velocidade não dependa do desempenho da CPU.
 
 ## Como assistir ao modelo
 
 Para visualizar um modelo jogando contra o mesmo oponente usado no treino:
 
 ```bash
-python main.py assistir modelo_rl.pt
+python main.py assistir
 ```
 
-Esse modo não atualiza a rede Q nem executa etapas de treinamento. Cada partida
+Esse modo não atualiza a tabela Q nem executa etapas de treinamento. Cada partida
 vai até o encerramento normal do Pong em 21 pontos, imprime o placar, reinicia
 automaticamente e respeita o limite `FPS_JOGO` definido em `config.py`. Use
 `ESC` para fechar.
@@ -145,12 +141,14 @@ etc.) estão centralizados em **`config.py`**.
 | `config.py`          | Configurações do projeto       |
 | `environment.py`     | Criação do ambiente PettingZoo Pong (modo RAM)                |
 | `heuristic_agent.py` | Agente de busca heurística baseado em posições da RAM           |
-| `training_opponent.py` | Adversário controlado usado para treinar devoluções            |
-| `rl_agent.py`        | Agente de RL: MLP + lógica de Q-Learning                |
+| `training_opponent.py` | Implementação alternativa de oponente com antecipação           |
+| `rl_agent.py`        | Agente de RL: estado discreto, tabela Q e Q-Learning            |
 | `train.py`           | Loop de treinamento do agente de RL                              |
 | `evaluate.py`        | Compara os dois agentes e imprime as estatísticas finais         |
-| `main.py`            | Ponto de entrada (`treinar` ou `avaliar`)                        |
-| `escanear_ram.py`    | Ferramenta de diagnóstico: descobre quais índices da RAM mudam de valor |
+| `jogar.py`           | Permite jogar contra a tabela Q treinada                         |
+| `assistir.py`        | Exibe o agente contra o oponente de treino                       |
+| `checkpoints.py`     | Nomeação e seleção dos checkpoints tabulares                     |
+| `main.py`            | Ponto de entrada dos comandos do projeto                         |
 | `requirements.txt`   | Dependências do projeto                                          |
 
 ## Explicação resumida dos agentes
@@ -165,19 +163,24 @@ se já está alinhada, confirma o saque.
 
 ### Agente de RL (`rl_agent.py`)
 
-Implementa Q-Learning clássico, mas em vez de uma tabela Q
-(inviável para 128 bytes de estado), usa uma MLP pequena (uma
-camada oculta) que recebe o vetor de RAM normalizado e retorna um
-valor Q estimado para cada uma das ações. A política usa apenas as três
-ações úteis para este treino: `FIRE`, `FIRE_RIGHT` e `FIRE_LEFT`. As
-transições ficam em uma memória de experiências e são sorteadas em lotes
-para reduzir a correlação entre quadros consecutivos. Uma segunda rede,
-atualizada periodicamente, calcula o alvo do Q-Learning:
+Implementa Q-Learning tabular. O ambiente entrega os 128 bytes da RAM e o
+agente faz feature engineering somente sobre essa percepção. Ele usa a posição
+X da bola (RAM 49), a posição Y da própria raquete (RAM 51) e a posição Y da
+bola (RAM 54). Esses valores formam um estado discreto com:
+
+- 8 faixas horizontais para a bola;
+- 7 faixas para o erro vertical entre bola e raquete;
+- 3 direções horizontais e 3 verticais, obtidas comparando a RAM atual com a anterior;
+- 1 estado específico para bola ausente/saque.
+
+O resultado são 505 estados. A tabela possui três ações por estado: `FIRE`,
+`FIRE_RIGHT` e `FIRE_LEFT`, totalizando 1.515 valores Q. Nenhum pixel ou dado
+externo ao vetor RAM é usado. A atualização aplicada após cada transição é:
 
 ```
-alvo = recompensa + gamma * max(Q(próximo_estado))
+Q(s,a) = Q(s,a) + alpha * (recompensa + gamma * max(Q(s',a')) - Q(s,a))
 ```
 
 Durante o treinamento, o agente usa uma política epsilon-greedy
 (explora ações aleatórias no início, e gradualmente passa a usar
-mais a rede treinada conforme o epsilon decai).
+mais a melhor ação registrada na tabela conforme o epsilon decai).

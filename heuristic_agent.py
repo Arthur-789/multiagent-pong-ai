@@ -38,7 +38,7 @@ def escolher_acao(observacao_ram):
     # Se estiver desalinhada, move a raquete na direção da bola
     jogador_y, oponente_y, bola_y = extrair_posicoes(observacao_ram)
 
-    dy = bola_y - jogador_y
+    dy = bola_y - oponente_y
 
     alinhado = abs(dy) <= TOLERANCIA_ALINHAMENTO
 

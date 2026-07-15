@@ -1,129 +1,145 @@
-# Agente de aprendizado por reforço: Q-Learning com aproximação por MLP.
+"""Agente de Q-learning tabular com estado derivado exclusivamente da RAM."""
 
-# Usamos uma MLP (Multilayer Perceptron) simples para aproximar a função Q(estado, ação).
-# A MLP recebe o vetor de 128 bytes e retorna um valor Q estimado para cada uma das 6 ações possíveis.
-
-# O treinamento segue a regra clássica do Q-Learning: Q(s, a) <- Q(s, a) + alpha * [r + gamma * max_a' Q(s', a') - Q(s, a)]
-# Porém, em vez de atualizar uma tabela, treinamos a MLP para que sua saída Q(s, a) se aproxime do valor-alvo (r + gamma * max Q(s', ·)).
-
+import os
 import random
-from collections import deque
+import tempfile
+from pathlib import Path
 
 import numpy as np
-import torch
-import torch.nn as nn
 
-from config import (
-    TAXA_APRENDIZADO,
-    FATOR_DESCONTO,
-    TAMANHO_CAMADA_OCULTA,
-    TAMANHO_MEMORIA,
-    TAMANHO_LOTE,
-    INTERVALO_TREINO,
-    INTERVALO_REDE_ALVO,
-)
+from config import FATOR_DESCONTO, TAXA_APRENDIZADO
 
-NUM_ACOES = 6  # Total de ações possíveis
+IDX_BOLA_X = 49
+IDX_JOGADOR_Y = 51
+IDX_BOLA_Y = 54
+
 ACOES_VALIDAS = (1, 4, 5)  # FIRE, FIRE_RIGHT e FIRE_LEFT
+NUM_FAIXAS_BOLA_X = 8
+LIMITES_ERRO_VERTICAL = (-32, -16, -4, 4, 16, 32)
+NUM_FAIXAS_ERRO = len(LIMITES_ERRO_VERTICAL) + 1
+NUM_DIRECOES = 3  # negativa, parada/desconhecida, positiva
+NUM_ESTADOS = 1 + NUM_FAIXAS_BOLA_X * NUM_FAIXAS_ERRO * NUM_DIRECOES**2
 
-class RedeQ(nn.Module):
+FORMATO_CHECKPOINT = 1
+ALGORITMO = "q_learning_tabular_ram"
 
-    def __init__(self):
-        super().__init__()
-        self.rede = nn.Sequential(
-            nn.Linear(128, TAMANHO_CAMADA_OCULTA),
-            nn.ReLU(),
-            nn.Linear(TAMANHO_CAMADA_OCULTA, NUM_ACOES),
-        )
 
-    def forward(self, x):
-        return self.rede(x)
+def _codigo_direcao(delta):
+    return 0 if delta < 0 else 2 if delta > 0 else 1
+
 
 class AgenteRL:
-
     def __init__(self):
-        self.dispositivo = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.rede = RedeQ().to(self.dispositivo)
-        self.rede_alvo = RedeQ().to(self.dispositivo)
-        self.rede_alvo.load_state_dict(self.rede.state_dict())
-        self.rede_alvo.eval()
-        self.otimizador = torch.optim.Adam(self.rede.parameters(), lr=TAXA_APRENDIZADO)
-        self.funcao_perda = nn.SmoothL1Loss()
-        self.memoria = deque(maxlen=TAMANHO_MEMORIA)
+        self.tabela_q = np.zeros((NUM_ESTADOS, len(ACOES_VALIDAS)), dtype=np.float32)
         self.passos = 0
         self.epsilon = 1.0
+        self.resetar_estado()
 
-    def _observacao_para_tensor(self, observacao_ram):
-        # Normaliza os bytes para o intervalo 0-1
-        vetor = np.array(observacao_ram, dtype=np.float32) / 255.0
-        return torch.from_numpy(vetor).unsqueeze(0).to(self.dispositivo)
+    def resetar_estado(self):
+        """Descarta o histórico usado para calcular a direção da bola."""
+        self._bola_anterior = None
 
-    def escolher_acao(self, observacao_ram, explorar=True):
-        """Escolhe ação com política epsilon-greedy."""
+    def extrair_estado(self, observacao_ram):
+        """Converte bytes selecionados da RAM em um dos estados discretos."""
+        bola_x = int(observacao_ram[IDX_BOLA_X])
+        bola_y = int(observacao_ram[IDX_BOLA_Y])
+        jogador_y = int(observacao_ram[IDX_JOGADOR_Y])
+
+        if bola_x == 0 or bola_y == 0:
+            self._bola_anterior = None
+            return 0  # Bola ausente: estado de saque.
+
+        delta_x = 0
+        delta_y = 0
+        if self._bola_anterior is not None:
+            delta_x = bola_x - self._bola_anterior[0]
+            delta_y = bola_y - self._bola_anterior[1]
+        self._bola_anterior = (bola_x, bola_y)
+
+        faixa_x = min(bola_x * NUM_FAIXAS_BOLA_X // 256, NUM_FAIXAS_BOLA_X - 1)
+        faixa_erro = int(
+            np.digitize(bola_y - jogador_y, LIMITES_ERRO_VERTICAL)
+        )
+        direcao_x = _codigo_direcao(delta_x)
+        direcao_y = _codigo_direcao(delta_y)
+
+        estado = faixa_x
+        estado = estado * NUM_FAIXAS_ERRO + faixa_erro
+        estado = estado * NUM_DIRECOES + direcao_x
+        estado = estado * NUM_DIRECOES + direcao_y
+        return 1 + estado
+
+    def escolher_acao(self, percepcao, explorar=True):
+        """Escolhe uma ação por política epsilon-greedy."""
+        estado = (
+            int(percepcao)
+            if isinstance(percepcao, (int, np.integer))
+            else self.extrair_estado(percepcao)
+        )
         if explorar and random.random() < self.epsilon:
             return random.choice(ACOES_VALIDAS)
 
-        with torch.no_grad():
-            estado = self._observacao_para_tensor(observacao_ram)
-            valores_q = self.rede(estado)[0]
-            melhor_indice = torch.argmax(valores_q[list(ACOES_VALIDAS)]).item()
-            return ACOES_VALIDAS[melhor_indice]
+        indice_acao = int(np.argmax(self.tabela_q[estado]))
+        return ACOES_VALIDAS[indice_acao]
 
     def treinar_passo(self, estado, acao, recompensa, proximo_estado, terminou):
-        self.memoria.append(
-            (
-                np.array(estado, dtype=np.uint8, copy=True),
-                acao,
-                recompensa,
-                np.array(proximo_estado, dtype=np.uint8, copy=True),
-                terminou,
-            )
-        )
+        """Aplica uma atualização da equação do Q-learning tabular."""
+        indice_acao = ACOES_VALIDAS.index(acao)
+        q_atual = self.tabela_q[estado, indice_acao]
+        melhor_q_futuro = 0.0 if terminou else float(self.tabela_q[proximo_estado].max())
+        alvo = recompensa + FATOR_DESCONTO * melhor_q_futuro
+        self.tabela_q[estado, indice_acao] += TAXA_APRENDIZADO * (alvo - q_atual)
         self.passos += 1
 
-        if len(self.memoria) < TAMANHO_LOTE or self.passos % INTERVALO_TREINO != 0:
-            return
-
-        lote = random.sample(self.memoria, TAMANHO_LOTE)
-        estados, acoes, recompensas, proximos_estados, terminos = zip(*lote)
-
-        estados_t = torch.from_numpy(
-            np.stack(estados).astype(np.float32) / 255.0
-        ).to(self.dispositivo)
-        proximos_estados_t = torch.from_numpy(
-            np.stack(proximos_estados).astype(np.float32) / 255.0
-        ).to(self.dispositivo)
-        acoes_t = torch.tensor(
-            acoes, dtype=torch.int64, device=self.dispositivo
-        ).unsqueeze(1)
-        recompensas_t = torch.tensor(
-            recompensas, dtype=torch.float32, device=self.dispositivo
-        )
-        terminos_t = torch.tensor(
-            terminos, dtype=torch.float32, device=self.dispositivo
-        )
-
-        q_atual = self.rede(estados_t).gather(1, acoes_t).squeeze(1)
-
-        with torch.no_grad():
-            proximo_q = self.rede_alvo(proximos_estados_t)[:, list(ACOES_VALIDAS)]
-            proximo_q_max = proximo_q.max(dim=1).values
-            alvo = recompensas_t + (1 - terminos_t) * FATOR_DESCONTO * proximo_q_max
-
-        perda = self.funcao_perda(q_atual, alvo)
-
-        self.otimizador.zero_grad()
-        perda.backward()
-        self.otimizador.step()
-
-        if self.passos % INTERVALO_REDE_ALVO == 0:
-            self.rede_alvo.load_state_dict(self.rede.state_dict())
-
-    def salvar(self, caminho):
-        torch.save(self.rede.state_dict(), caminho)
+    def salvar(self, caminho, episodio=None):
+        caminho = Path(caminho)
+        caminho.parent.mkdir(parents=True, exist_ok=True)
+        temporario = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                dir=caminho.parent,
+                prefix=f".{caminho.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as arquivo:
+                temporario = Path(arquivo.name)
+                np.savez_compressed(
+                    arquivo,
+                    formato=np.int64(FORMATO_CHECKPOINT),
+                    algoritmo=np.array(ALGORITMO),
+                    episodio=np.int64(episodio or 0),
+                    epsilon=np.float64(self.epsilon),
+                    passos=np.int64(self.passos),
+                    acoes=np.array(ACOES_VALIDAS, dtype=np.int64),
+                    tabela_q=self.tabela_q,
+                )
+                arquivo.flush()
+                os.fsync(arquivo.fileno())
+            os.replace(temporario, caminho)
+        except BaseException:
+            if temporario is not None:
+                temporario.unlink(missing_ok=True)
+            raise
 
     def carregar(self, caminho):
-        estado = torch.load(caminho, map_location=self.dispositivo)
-        self.rede.load_state_dict(estado)
-        self.rede_alvo.load_state_dict(self.rede.state_dict())
-        self.rede.eval()
+        try:
+            with np.load(caminho, allow_pickle=False) as estado:
+                formato = int(estado["formato"])
+                algoritmo = str(estado["algoritmo"])
+                acoes = tuple(int(acao) for acao in estado["acoes"])
+                tabela_q = estado["tabela_q"]
+
+                if formato != FORMATO_CHECKPOINT or algoritmo != ALGORITMO:
+                    raise ValueError("checkpoint não pertence ao agente tabular atual")
+                if acoes != ACOES_VALIDAS or tabela_q.shape != self.tabela_q.shape:
+                    raise ValueError("checkpoint usa ações ou discretização incompatíveis")
+
+                self.tabela_q[:] = tabela_q
+                self.epsilon = float(estado["epsilon"])
+                self.passos = int(estado["passos"])
+                episodio = int(estado["episodio"])
+        except (KeyError, ValueError) as erro:
+            raise ValueError(f"checkpoint tabular inválido: {caminho}") from erro
+
+        self.resetar_estado()
+        return episodio

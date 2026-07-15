@@ -2,17 +2,28 @@
 
 import sys
 
+import pygame
+
 from environment import criar_ambiente
 from rl_agent import AgenteRL
 import heuristic_agent
-from config import PARTIDAS_AVALIACAO, CAMINHO_MODELO, RENDER_AVALIACAO, SEED
+from checkpoints import checkpoint_mais_recente
+from config import (
+    PARTIDAS_AVALIACAO,
+    CAMINHO_MODELO,
+    DIRETORIO_CHECKPOINTS,
+    RENDER_AVALIACAO,
+    FPS_JOGO,
+    SEED,
+)
 
 NOME_RL = "first_0"
 NOME_HEURISTICO = "second_0"
 
-def jogar_partida(env, agente_rl, seed):
+def jogar_partida(env, agente_rl, seed, relogio=None):
     # Joga uma partida completa e retorna a recompensa total de cada agente
     env.reset(seed=seed)
+    agente_rl.resetar_estado()
     recompensa_rl = 0
     recompensa_heuristico = 0
 
@@ -27,15 +38,19 @@ def jogar_partida(env, agente_rl, seed):
             acao = None if (terminou or truncado) else heuristic_agent.escolher_acao(observacao)
 
         env.step(acao)
+        if relogio is not None and agente == NOME_HEURISTICO:
+            relogio.tick(FPS_JOGO)
 
     return recompensa_rl, recompensa_heuristico
 
 def avaliar(render=RENDER_AVALIACAO):
     render_mode = "human" if render else None
     env = criar_ambiente(render_mode=render_mode)
+    relogio = pygame.time.Clock() if render else None
 
     agente_rl = AgenteRL()
-    agente_rl.carregar(CAMINHO_MODELO)
+    caminho_modelo = checkpoint_mais_recente(DIRETORIO_CHECKPOINTS) or CAMINHO_MODELO
+    agente_rl.carregar(caminho_modelo)
 
     vitorias_heuristico = 0
     vitorias_rl = 0
@@ -43,11 +58,13 @@ def avaliar(render=RENDER_AVALIACAO):
     pontuacoes_rl = []
     pontuacoes_heuristico = []
 
-    print(f"Dispositivo PyTorch: {agente_rl.dispositivo}")
+    print(f"Modelo: {caminho_modelo}")
     print(f"Avaliando agentes em {PARTIDAS_AVALIACAO} partidas...\n")
 
     for partida in range(1, PARTIDAS_AVALIACAO + 1):
-        pontos_rl, pontos_heuristico = jogar_partida(env, agente_rl, seed=SEED + partida)
+        pontos_rl, pontos_heuristico = jogar_partida(
+            env, agente_rl, seed=SEED + partida, relogio=relogio
+        )
         pontuacoes_rl.append(pontos_rl)
         pontuacoes_heuristico.append(pontos_heuristico)
 

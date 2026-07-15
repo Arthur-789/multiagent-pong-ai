@@ -20,7 +20,7 @@ def main():
     ):
         print(
             "Uso: python main.py [treinar|avaliar|jogar|assistir] "
-            "[--render] [modelo.pt]"
+            "[--render] [tabela.npz]"
         )
         return
 

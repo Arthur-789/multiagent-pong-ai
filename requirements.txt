@@ -1,0 +1,4 @@
+numpy
+pettingzoo[atari]
+autorom[accept-rom-license]
+torch

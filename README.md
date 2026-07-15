@@ -69,13 +69,39 @@ AutoROM --accept-license
 python main.py treinar
 ```
 
-Isso treina o agente de RL jogando contra o agente heurístico, salvando o modelo treinado em `modelo_rl.pt`. O progresso é impresso no terminal a cada 10 episódios.
+Isso treina o agente de RL contra um adversário controlado que antecipa a
+trajetória da bola e tenta devolvê-la continuamente. O RL recebe recompensa
+por aproximar a raquete enquanto a bola vem, recompensa imediata ao rebater,
+uma recompensa muito maior ao marcar e uma punição forte ao sofrer um ponto.
+Pontos sem uma rebatida anterior não geram recompensa gratuita. Os valores
+ficam em `config.py`. Ao final, o modelo
+treinado é salvo em `modelo_rl.pt`. O progresso e o número de rebatidas são
+impressos no terminal a cada 10 episódios.
 
 ## Como avaliar
 
 ```bash
 python main.py avaliar
 ```
+
+## Como jogar
+
+```bash
+python main.py jogar modelo_rl.pt
+```
+
+Ou diretamente:
+
+```bash
+python jogar.py modelo_rl.pt
+```
+
+Controles:
+
+- `W` ou `↑` sobe
+- `S` ou `↓` desce
+- `SPACE` serve
+- `ESC` sai
 
 Carrega o modelo treinado e joga várias partidas do agente de RL contra o agente heurístico, exibindo ao final:
 
@@ -113,6 +139,7 @@ etc.) estão centralizados em **`config.py`**.
 | `config.py`          | Configurações do projeto       |
 | `environment.py`     | Criação do ambiente PettingZoo Pong (modo RAM)                |
 | `heuristic_agent.py` | Agente de busca heurística baseado em posições da RAM           |
+| `training_opponent.py` | Adversário controlado usado para treinar devoluções            |
 | `rl_agent.py`        | Agente de RL: MLP + lógica de Q-Learning                |
 | `train.py`           | Loop de treinamento do agente de RL                              |
 | `evaluate.py`        | Compara os dois agentes e imprime as estatísticas finais         |
@@ -135,9 +162,11 @@ se já está alinhada, confirma o saque.
 Implementa Q-Learning clássico, mas em vez de uma tabela Q
 (inviável para 128 bytes de estado), usa uma MLP pequena (uma
 camada oculta) que recebe o vetor de RAM normalizado e retorna um
-valor Q estimado para cada uma das 6 ações possíveis. A cada passo
-do treinamento, a rede é atualizada para aproximar o alvo do
-Q-Learning:
+valor Q estimado para cada uma das ações. A política usa apenas as três
+ações úteis para este treino: `FIRE`, `FIRE_RIGHT` e `FIRE_LEFT`. As
+transições ficam em uma memória de experiências e são sorteadas em lotes
+para reduzir a correlação entre quadros consecutivos. Uma segunda rede,
+atualizada periodicamente, calcula o alvo do Q-Learning:
 
 ```
 alvo = recompensa + gamma * max(Q(próximo_estado))

@@ -21,27 +21,27 @@ NOME_RL = "first_0"
 NOME_HEURISTICO = "second_0"
 
 def jogar_partida(env, agente_rl, seed, relogio=None):
-    # Joga uma partida completa e retorna a recompensa total de cada agente
+    # Joga uma partida completa e retorna os pontos feitos por cada agente
     env.reset(seed=seed)
     agente_rl.resetar_estado()
-    recompensa_rl = 0
-    recompensa_heuristico = 0
+    pontos_rl = 0
+    pontos_heuristico = 0
 
     for agente in env.agent_iter():
         observacao, recompensa, terminou, truncado, _ = env.last()
 
         if agente == NOME_RL:
-            recompensa_rl += recompensa
+            pontos_rl += int(recompensa > 0)
             acao = None if (terminou or truncado) else agente_rl.escolher_acao(observacao, explorar=False)
         else:
-            recompensa_heuristico += recompensa
+            pontos_heuristico += int(recompensa > 0)
             acao = None if (terminou or truncado) else heuristic_agent.escolher_acao(observacao)
 
         env.step(acao)
         if relogio is not None and agente == NOME_HEURISTICO:
             relogio.tick(FPS_JOGO)
 
-    return recompensa_rl, recompensa_heuristico
+    return pontos_rl, pontos_heuristico
 
 def avaliar(render=RENDER_AVALIACAO):
     render_mode = "human" if render else None

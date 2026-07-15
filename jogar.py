@@ -5,7 +5,7 @@ import sys
 
 import pygame
 
-from config import CAMINHO_MODELO, SEED
+from config import CAMINHO_MODELO, FPS_JOGO, SEED
 from environment import criar_ambiente
 from rl_agent import AgenteRL
 
@@ -55,11 +55,14 @@ def jogar(modelo=CAMINHO_MODELO):
     agente_modelo.carregar(caminho_modelo)
 
     print(f"Jogando contra o modelo: {caminho_modelo}")
+    print(f"Dispositivo PyTorch: {agente_modelo.dispositivo}")
     print("Controles: W/↑ sobe, S/↓ desce, SPACE serve, ESC sai.")
 
     try:
         env.reset(seed=SEED)
         env.render()
+        relogio = pygame.time.Clock()
+        fps = FPS_JOGO
         passos_humano = 0
         while True:
             for agente in env.agent_iter():
@@ -79,6 +82,9 @@ def jogar(modelo=CAMINHO_MODELO):
                     )
 
                 env.step(acao)
+                if agente == NOME_HUMANO:
+                    # Um ciclo do Atari termina após os dois agentes agirem.
+                    relogio.tick(fps)
 
             env.reset()
             env.render()

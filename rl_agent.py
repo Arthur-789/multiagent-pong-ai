@@ -42,8 +42,9 @@ class RedeQ(nn.Module):
 class AgenteRL:
 
     def __init__(self):
-        self.rede = RedeQ()
-        self.rede_alvo = RedeQ()
+        self.dispositivo = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.rede = RedeQ().to(self.dispositivo)
+        self.rede_alvo = RedeQ().to(self.dispositivo)
         self.rede_alvo.load_state_dict(self.rede.state_dict())
         self.rede_alvo.eval()
         self.otimizador = torch.optim.Adam(self.rede.parameters(), lr=TAXA_APRENDIZADO)
@@ -55,7 +56,7 @@ class AgenteRL:
     def _observacao_para_tensor(self, observacao_ram):
         # Normaliza os bytes para o intervalo 0-1
         vetor = np.array(observacao_ram, dtype=np.float32) / 255.0
-        return torch.from_numpy(vetor).unsqueeze(0)
+        return torch.from_numpy(vetor).unsqueeze(0).to(self.dispositivo)
 
     def escolher_acao(self, observacao_ram, explorar=True):
         """Escolhe ação com política epsilon-greedy."""
@@ -86,13 +87,21 @@ class AgenteRL:
         lote = random.sample(self.memoria, TAMANHO_LOTE)
         estados, acoes, recompensas, proximos_estados, terminos = zip(*lote)
 
-        estados_t = torch.from_numpy(np.stack(estados).astype(np.float32) / 255.0)
+        estados_t = torch.from_numpy(
+            np.stack(estados).astype(np.float32) / 255.0
+        ).to(self.dispositivo)
         proximos_estados_t = torch.from_numpy(
             np.stack(proximos_estados).astype(np.float32) / 255.0
+        ).to(self.dispositivo)
+        acoes_t = torch.tensor(
+            acoes, dtype=torch.int64, device=self.dispositivo
+        ).unsqueeze(1)
+        recompensas_t = torch.tensor(
+            recompensas, dtype=torch.float32, device=self.dispositivo
         )
-        acoes_t = torch.tensor(acoes, dtype=torch.int64).unsqueeze(1)
-        recompensas_t = torch.tensor(recompensas, dtype=torch.float32)
-        terminos_t = torch.tensor(terminos, dtype=torch.float32)
+        terminos_t = torch.tensor(
+            terminos, dtype=torch.float32, device=self.dispositivo
+        )
 
         q_atual = self.rede(estados_t).gather(1, acoes_t).squeeze(1)
 
@@ -114,6 +123,7 @@ class AgenteRL:
         torch.save(self.rede.state_dict(), caminho)
 
     def carregar(self, caminho):
-        self.rede.load_state_dict(torch.load(caminho))
+        estado = torch.load(caminho, map_location=self.dispositivo)
+        self.rede.load_state_dict(estado)
         self.rede_alvo.load_state_dict(self.rede.state_dict())
         self.rede.eval()

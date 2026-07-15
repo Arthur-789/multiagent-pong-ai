@@ -4,7 +4,7 @@ OBS_TYPE = "ram"  # Cada agente recebe os 128 bytes da RAM do Atari
 MAX_CYCLES = 20000  # Limite de passos por partida
 
 # Treinamento do agente de RL
-TREINO_EPISODIOS = 100  # Número de episódios de treinamento
+TREINO_EPISODIOS = 400  # Número de episódios de treinamento
 TAXA_APRENDIZADO = 1e-3  # Taxa de aprendizagem da MLP
 FATOR_DESCONTO = 0.95  # Gamma do Q-Learning
 EPSILON_INICIAL = 1.0  # Exploração inicial (100%)
@@ -27,6 +27,7 @@ PARTIDAS_AVALIACAO = 20  # Quantas partidas rodar na comparação final
 # Visualização (Se True, abre uma janela mostrando os agentes jogando)
 RENDER_TREINO = False
 RENDER_AVALIACAO = False
+FPS_JOGO = 90  # Limite de FPS ao jogar
 
 # Geral
 SEED = 42

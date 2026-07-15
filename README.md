@@ -63,6 +63,10 @@ AutoROM --accept-license
 - `torch` - implementação da MLP usada como aproximador de Q
 - `numpy` - manipulação de vetores
 
+As redes e os tensores usam CUDA automaticamente quando uma GPU compatível e
+uma instalação do PyTorch com suporte a CUDA estão disponíveis. Caso contrário,
+o projeto continua usando a CPU.
+
 ## Como treinar
 
 ```bash
@@ -104,6 +108,10 @@ Controles:
 - `ESC` sai
 
 Carrega o modelo treinado e joga várias partidas do agente de RL contra o agente heurístico, exibindo ao final:
+
+No modo jogável, a execução é limitada à taxa de quadros definida pelo
+ambiente Atari para que a velocidade não dependa do desempenho da CPU ou do
+tempo de inferência do modelo.
 
 ```
 Resultados

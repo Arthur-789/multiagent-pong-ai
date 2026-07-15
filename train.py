@@ -41,6 +41,7 @@ def treinar(render=RENDER_TREINO):
     NOME_OPONENTE_TREINO = "second_0"
 
     print("Iniciando treinamento do agente de RL...")
+    print(f"Dispositivo PyTorch: {agente_rl.dispositivo}")
     print(f"Episódios: {TREINO_EPISODIOS}\n")
 
     for episodio in range(1, TREINO_EPISODIOS + 1):

@@ -43,6 +43,7 @@ def avaliar(render=RENDER_AVALIACAO):
     pontuacoes_rl = []
     pontuacoes_heuristico = []
 
+    print(f"Dispositivo PyTorch: {agente_rl.dispositivo}")
     print(f"Avaliando agentes em {PARTIDAS_AVALIACAO} partidas...\n")
 
     for partida in range(1, PARTIDAS_AVALIACAO + 1):

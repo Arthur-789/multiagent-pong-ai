@@ -36,7 +36,7 @@ def main():
     elif sys.argv[1] == "assistir":
         assistir(modelo=modelo)
     else:
-        avaliar(render=forcar_render or RENDER_AVALIACAO)
+        avaliar(modelo=modelo, render=forcar_render or RENDER_AVALIACAO)
 
 if __name__ == "__main__":
     main()

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from config import FATOR_DESCONTO, TAXA_APRENDIZADO
+from config import FATOR_DESCONTO, TAXA_APRENDIZADO, TAXA_APRENDIZADO_FINAL
 
 IDX_BOLA_X = 49
 IDX_JOGADOR_Y = 51
@@ -20,7 +20,7 @@ NUM_FAIXAS_ERRO = len(LIMITES_ERRO_VERTICAL) + 1
 NUM_DIRECOES = 3  # negativa, parada/desconhecida, positiva
 NUM_ESTADOS = 1 + NUM_FAIXAS_BOLA_X * NUM_FAIXAS_ERRO * NUM_DIRECOES**2
 
-FORMATO_CHECKPOINT = 1
+FORMATO_CHECKPOINT = 2
 ALGORITMO = "q_learning_tabular_ram"
 
 
@@ -31,6 +31,7 @@ def _codigo_direcao(delta):
 class AgenteRL:
     def __init__(self):
         self.tabela_q = np.zeros((NUM_ESTADOS, len(ACOES_VALIDAS)), dtype=np.float32)
+        self.visitas = np.zeros_like(self.tabela_q, dtype=np.uint32)
         self.passos = 0
         self.epsilon = 1.0
         self.resetar_estado()
@@ -88,7 +89,13 @@ class AgenteRL:
         q_atual = self.tabela_q[estado, indice_acao]
         melhor_q_futuro = 0.0 if terminou else float(self.tabela_q[proximo_estado].max())
         alvo = recompensa + FATOR_DESCONTO * melhor_q_futuro
-        self.tabela_q[estado, indice_acao] += TAXA_APRENDIZADO * (alvo - q_atual)
+        visitas = int(self.visitas[estado, indice_acao]) + 1
+        taxa_aprendizado = (
+            TAXA_APRENDIZADO_FINAL
+            + (TAXA_APRENDIZADO - TAXA_APRENDIZADO_FINAL) / np.sqrt(visitas)
+        )
+        self.tabela_q[estado, indice_acao] += taxa_aprendizado * (alvo - q_atual)
+        self.visitas[estado, indice_acao] = visitas
         self.passos += 1
 
     def salvar(self, caminho, episodio=None):
@@ -112,6 +119,7 @@ class AgenteRL:
                     passos=np.int64(self.passos),
                     acoes=np.array(ACOES_VALIDAS, dtype=np.int64),
                     tabela_q=self.tabela_q,
+                    visitas=self.visitas,
                 )
                 arquivo.flush()
                 os.fsync(arquivo.fileno())
@@ -128,13 +136,19 @@ class AgenteRL:
                 algoritmo = str(estado["algoritmo"])
                 acoes = tuple(int(acao) for acao in estado["acoes"])
                 tabela_q = estado["tabela_q"]
+                visitas = estado["visitas"]
 
                 if formato != FORMATO_CHECKPOINT or algoritmo != ALGORITMO:
                     raise ValueError("checkpoint não pertence ao agente tabular atual")
-                if acoes != ACOES_VALIDAS or tabela_q.shape != self.tabela_q.shape:
+                if (
+                    acoes != ACOES_VALIDAS
+                    or tabela_q.shape != self.tabela_q.shape
+                    or visitas.shape != self.visitas.shape
+                ):
                     raise ValueError("checkpoint usa ações ou discretização incompatíveis")
 
                 self.tabela_q[:] = tabela_q
+                self.visitas[:] = visitas
                 self.epsilon = float(estado["epsilon"])
                 self.passos = int(estado["passos"])
                 episodio = int(estado["episodio"])

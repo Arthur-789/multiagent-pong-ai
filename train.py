@@ -2,9 +2,12 @@
 
 import sys
 import random
+from collections import deque
+
 import numpy as np
 
 from environment import criar_ambiente
+from evaluate import jogar_partida
 from rl_agent import AgenteRL
 import heuristic_agent
 from checkpoints import caminho_checkpoint, checkpoint_mais_recente
@@ -13,18 +16,55 @@ from config import (
     EPSILON_INICIAL,
     EPSILON_FINAL,
     EPSILON_DECAIMENTO,
+    CAMINHO_MELHOR_CHECKPOINT,
     DIRETORIO_CHECKPOINTS,
+    INTERVALO_VALIDACAO,
+    PARTIDAS_VALIDACAO,
+    PROBABILIDADE_ACAO_REPETIDA_AVALIACAO,
     RENDER_TREINO,
     RECOMPENSA_APROXIMACAO,
     RECOMPENSA_REBATIDA,
     RECOMPENSA_PONTO,
     PUNICAO_PONTO_SOFRIDO,
     SEED,
+    SEED_VALIDACAO,
 )
 
 IDX_BOLA_X = 49
 IDX_BOLA_Y = 54
 IDX_JOGADOR_Y = 51
+
+
+def avaliar_para_selecao(agente_rl):
+    env = criar_ambiente(
+        probabilidade_acao_repetida=PROBABILIDADE_ACAO_REPETIDA_AVALIACAO
+    )
+    margens = []
+    pontos = []
+    vitorias = 0
+    try:
+        for partida in range(PARTIDAS_VALIDACAO):
+            pontos_rl, pontos_oponente, truncada = jogar_partida(
+                env,
+                agente_rl,
+                seed=SEED_VALIDACAO + partida,
+            )
+            if truncada:
+                continue
+            margens.append(pontos_rl - pontos_oponente)
+            pontos.append(pontos_rl)
+            vitorias += int(pontos_rl > pontos_oponente)
+    finally:
+        env.close()
+
+    if not margens:
+        raise RuntimeError("todas as partidas de validação foram truncadas")
+
+    return {
+        "margem_media": sum(margens) / len(margens),
+        "pontos_medios": sum(pontos) / len(pontos),
+        "taxa_vitoria": vitorias / len(margens),
+    }
 
 def treinar(render=RENDER_TREINO):
     random.seed(SEED)
@@ -40,6 +80,23 @@ def treinar(render=RENDER_TREINO):
     else:
         ultimo_episodio = agente_rl.carregar(ultimo_checkpoint)
         episodio_inicial = ultimo_episodio + 1
+        agente_rl.epsilon = max(
+            EPSILON_FINAL,
+            EPSILON_INICIAL * EPSILON_DECAIMENTO ** ultimo_episodio,
+        )
+
+    recompensas_recentes = deque(maxlen=100)
+    rebatidas_recentes = deque(maxlen=100)
+    vitorias_recentes = deque(maxlen=100)
+    melhor_margem = float("-inf")
+    if ultimo_checkpoint is not None:
+        try:
+            agente_melhor = AgenteRL()
+            agente_melhor.carregar(CAMINHO_MELHOR_CHECKPOINT)
+        except FileNotFoundError:
+            pass
+        else:
+            melhor_margem = avaliar_para_selecao(agente_melhor)["margem_media"]
 
     NOME_RL = "first_0"
     NOME_OPONENTE_TREINO = "second_0"
@@ -71,6 +128,7 @@ def treinar(render=RENDER_TREINO):
             observacao, recompensa, terminou, truncado, _ = env.last()
 
             if agente == NOME_RL:
+                fim_do_rally = recompensa != 0
                 if recompensa != 0:
                     agente_rl.resetar_estado()
                 estado_rl = agente_rl.extrair_estado(observacao)
@@ -94,8 +152,7 @@ def treinar(render=RENDER_TREINO):
                 recompensa_treino = 0.0
                 if recompensa > 0:
                     pontos_feitos += 1
-                    if rebateu_no_rally:
-                        recompensa_treino = RECOMPENSA_PONTO
+                    recompensa_treino = RECOMPENSA_PONTO
                     rebateu_no_rally = False
                 elif recompensa < 0:
                     recompensa_treino = PUNICAO_PONTO_SOFRIDO
@@ -122,9 +179,13 @@ def treinar(render=RENDER_TREINO):
                         ultima_acao_rl[agente],
                         recompensa_treino,
                         estado_rl,
-                        terminou or truncado,
+                        terminou or truncado or fim_do_rally,
                     )
                 recompensa_total += recompensa_treino
+
+                # Cada rally e um episodio de treino: o primeiro ponto decide.
+                if fim_do_rally:
+                    break
 
                 if terminou or truncado:
                     acao = None
@@ -148,12 +209,31 @@ def treinar(render=RENDER_TREINO):
             episodio=episodio,
         )
 
-        if episodio % 10 == 0 or episodio == 1:
+        if episodio % INTERVALO_VALIDACAO == 0 or episodio == TREINO_EPISODIOS:
+            resultado_validacao = avaliar_para_selecao(agente_rl)
+            print(
+                f"Validação {episodio}: margem média "
+                f"{resultado_validacao['margem_media']:.2f} | "
+                f"pontos RL {resultado_validacao['pontos_medios']:.2f} | "
+                f"vitórias {resultado_validacao['taxa_vitoria']:.1%}"
+            )
+            if resultado_validacao["margem_media"] > melhor_margem:
+                melhor_margem = resultado_validacao["margem_media"]
+                agente_rl.salvar(CAMINHO_MELHOR_CHECKPOINT, episodio=episodio)
+                print(f"Novo melhor checkpoint: '{CAMINHO_MELHOR_CHECKPOINT}'.")
+
+        recompensas_recentes.append(recompensa_total)
+        rebatidas_recentes.append(total_rebatidas)
+        vitorias_recentes.append(pontos_feitos > pontos_sofridos)
+
+        if episodio % 100 == 0 or episodio == episodio_inicial:
+            tamanho_janela = len(vitorias_recentes)
             print(
                 f"Episódio {episodio}/{TREINO_EPISODIOS} | "
-                f"Recompensa treino: {recompensa_total:.1f} | "
-                f"Rebatidas: {total_rebatidas} | "
-                f"Placar: {pontos_feitos}x{pontos_sofridos} | "
+                f"Últimos {tamanho_janela}: "
+                f"vitórias {sum(vitorias_recentes) / tamanho_janela:.1%} | "
+                f"recompensa média {sum(recompensas_recentes) / tamanho_janela:.1f} | "
+                f"rebatidas médias {sum(rebatidas_recentes) / tamanho_janela:.2f} | "
                 f"Epsilon: {agente_rl.epsilon:.3f}"
             )
 

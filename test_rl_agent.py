@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from config import FATOR_DESCONTO, TAXA_APRENDIZADO
+from config import FATOR_DESCONTO, TAXA_APRENDIZADO, TAXA_APRENDIZADO_FINAL
 from rl_agent import ACOES_VALIDAS, AgenteRL, NUM_ESTADOS
 
 
@@ -57,6 +57,21 @@ class AgenteRLTest(unittest.TestCase):
         self.assertAlmostEqual(
             float(agente.tabela_q[1, 0]), TAXA_APRENDIZADO * -10.0, places=6
         )
+
+    def test_taxa_de_aprendizado_diminui_com_as_visitas(self):
+        agente = AgenteRL()
+        acao = ACOES_VALIDAS[0]
+
+        agente.treinar_passo(1, acao, 10.0, 2, terminou=True)
+        primeiro_valor = float(agente.tabela_q[1, 0])
+        agente.treinar_passo(1, acao, 10.0, 2, terminou=True)
+
+        segunda_taxa = TAXA_APRENDIZADO_FINAL + (
+            TAXA_APRENDIZADO - TAXA_APRENDIZADO_FINAL
+        ) / np.sqrt(2)
+        esperado = primeiro_valor + segunda_taxa * (10.0 - primeiro_valor)
+        self.assertAlmostEqual(float(agente.tabela_q[1, 0]), esperado, places=6)
+        self.assertEqual(int(agente.visitas[1, 0]), 2)
 
 
 if __name__ == "__main__":

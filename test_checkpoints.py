@@ -26,6 +26,7 @@ class CheckpointsTest(unittest.TestCase):
             agente.epsilon = 0.42
             agente.passos = 321
             agente.tabela_q[7, 2] = 8.5
+            agente.visitas[7, 2] = 123
             agente.salvar(caminho, episodio=12)
 
             restaurado = AgenteRL()
@@ -35,6 +36,7 @@ class CheckpointsTest(unittest.TestCase):
             self.assertEqual(restaurado.epsilon, 0.42)
             self.assertEqual(restaurado.passos, 321)
             np.testing.assert_array_equal(agente.tabela_q, restaurado.tabela_q)
+            np.testing.assert_array_equal(agente.visitas, restaurado.visitas)
 
     def test_falha_na_serializacao_nao_cria_checkpoint_parcial(self):
         with tempfile.TemporaryDirectory() as diretorio:

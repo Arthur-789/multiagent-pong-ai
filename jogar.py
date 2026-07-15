@@ -6,7 +6,13 @@ import sys
 import pygame
 
 from checkpoints import checkpoint_mais_recente
-from config import CAMINHO_MODELO, DIRETORIO_CHECKPOINTS, FPS_JOGO, SEED
+from config import (
+    CAMINHO_MELHOR_CHECKPOINT,
+    CAMINHO_MODELO,
+    DIRETORIO_CHECKPOINTS,
+    FPS_JOGO,
+    SEED,
+)
 from environment import criar_ambiente
 from rl_agent import AgenteRL
 
@@ -17,6 +23,8 @@ INTERVALO_MOVIMENTO_HUMANO = 3
 
 def resolver_modelo(argumento):
     if not argumento:
+        if os.path.exists(CAMINHO_MELHOR_CHECKPOINT):
+            return CAMINHO_MELHOR_CHECKPOINT
         return checkpoint_mais_recente(DIRETORIO_CHECKPOINTS) or CAMINHO_MODELO
     if os.path.exists(argumento):
         return argumento

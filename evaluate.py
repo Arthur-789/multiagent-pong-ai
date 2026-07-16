@@ -19,41 +19,45 @@ from config import (
 IDX_PLACAR_ESQ = 14
 IDX_PLACAR_DIR = 13
 
+LADO_ESQUERDO = "first_0"
+LADO_DIREITO = "second_0"
+
 PREFERENCIAS = {
-    "rl": "first_0",
-    "genetico": "second_0",
+    "rl": LADO_ESQUERDO,
+    "genetico": LADO_DIREITO,
     "heuristico": None
 }
 
-def instanciar_agente(tipo):
+class AgenteHeuristicoWrapper:
+    def __init__(self, agente_id):
+        self.agente_id = agente_id
+
+    def resetar_estado(self):
+        pass
+
+    def escolher_acao(self, observacao, explorar=False):
+        return heuristic_agent.escolher_acao(observacao, agente_id=self.agente_id)
+
+def instanciar_agente(tipo, agente_id):
     if tipo == "rl":
         agente = AgenteRL()
         agente.carregar("checkpoints_tabular/melhor_qtable.npz")
         return agente
     elif tipo == "genetico":
         cromossomo = np.load("melhor_cromossomo.npy")
-        return AgenteGenetico(cromossomo)
+        agente = AgenteGenetico(cromossomo)
+        # Genético não tem resetar_estado originalmente, então criamos um mock
+        agente.resetar_estado = lambda: None
+        return agente
     elif tipo == "heuristico":
-        return None
+        return AgenteHeuristicoWrapper(agente_id)
     else:
         raise ValueError(f"Agente desconhecido: {tipo}")
 
-def obter_acao(agente_type, agente_inst, observacao, recompensa, terminou, truncado, nome_agente):
-    if terminou or truncado:
-        return None
-    if agente_type == "rl":
-        if recompensa != 0:
-            agente_inst.resetar_estado()
-        return agente_inst.escolher_acao(observacao, explorar=False)
-    elif agente_type == "genetico":
-        return agente_inst.escolher_acao(observacao)
-    elif agente_type == "heuristico":
-        return heuristic_agent.escolher_acao(observacao, agente_id=nome_agente)
-
-def jogar_partida(env, esq_type, esq_agent, dir_type, dir_agent, seed, relogio=None):
+def jogar_partida(env, esq_agent, dir_agent, seed, relogio=None):
     env.reset(seed=seed)
-    if esq_type == "rl": esq_agent.resetar_estado()
-    if dir_type == "rl": dir_agent.resetar_estado()
+    esq_agent.resetar_estado()
+    dir_agent.resetar_estado()
     
     pontos_esq = 0
     pontos_dir = 0
@@ -65,38 +69,56 @@ def jogar_partida(env, esq_type, esq_agent, dir_type, dir_agent, seed, relogio=N
         pontos_dir = int(observacao[IDX_PLACAR_DIR])
         partida_truncada = partida_truncada or truncado
 
-        if nome_agente == "first_0":
-            acao = obter_acao(esq_type, esq_agent, observacao, recompensa, terminou, truncado, nome_agente)
+        if terminou or truncado:
+            acao = None
         else:
-            acao = obter_acao(dir_type, dir_agent, observacao, recompensa, terminou, truncado, nome_agente)
+            if nome_agente == LADO_ESQUERDO:
+                if recompensa != 0:
+                    esq_agent.resetar_estado()
+                acao = esq_agent.escolher_acao(observacao, explorar=False) if hasattr(esq_agent, 'escolher_acao_explorar') else esq_agent.escolher_acao(observacao)
+                # Na verdade, rl usa explorar=False, genetico usa nada, wrapper aceita explorar.
+                # Vamos padronizar: o wrapper pode ignorar kwargs. O RL requer explorar=False.
+                # Como o Genético não aceita kwargs, precisamos lidar com isso.
+            else:
+                if recompensa != 0:
+                    dir_agent.resetar_estado()
+                acao = dir_agent.escolher_acao(observacao, explorar=False) if hasattr(dir_agent, 'escolher_acao_explorar') else dir_agent.escolher_acao(observacao)
 
         env.step(acao)
-        if relogio is not None and nome_agente == "first_0":
+        if relogio is not None and nome_agente == LADO_ESQUERDO:
             relogio.tick(FPS_JOGO)
 
     return pontos_esq, pontos_dir, partida_truncada
 
 def alocar_lados(agente1, agente2):
+    if agente1 not in PREFERENCIAS:
+        raise ValueError(f"Agente desconhecido: {agente1}. Opções: rl, genetico, heuristico.")
+    if agente2 not in PREFERENCIAS:
+        raise ValueError(f"Agente desconhecido: {agente2}. Opções: rl, genetico, heuristico.")
+
     p1 = PREFERENCIAS[agente1]
     p2 = PREFERENCIAS[agente2]
 
     if p1 is not None and p2 is not None and p1 == p2:
         raise ValueError(f"Não é possível colocar {agente1} contra {agente2} pois ambos requerem o lado {p1}")
 
-    if p1 == "first_0" or p2 == "second_0":
-        return agente1, instanciar_agente(agente1), agente2, instanciar_agente(agente2)
-    elif p1 == "second_0" or p2 == "first_0":
-        return agente2, instanciar_agente(agente2), agente1, instanciar_agente(agente1)
+    if p1 == LADO_ESQUERDO or p2 == LADO_DIREITO:
+        return (agente1, instanciar_agente(agente1, LADO_ESQUERDO), 
+                agente2, instanciar_agente(agente2, LADO_DIREITO))
+    elif p1 == LADO_DIREITO or p2 == LADO_ESQUERDO:
+        return (agente2, instanciar_agente(agente2, LADO_ESQUERDO), 
+                agente1, instanciar_agente(agente1, LADO_DIREITO))
     else:
         # Ambos None (heuristico vs heuristico)
-        return agente1, instanciar_agente(agente1), agente2, instanciar_agente(agente2)
+        return (agente1, instanciar_agente(agente1, LADO_ESQUERDO), 
+                agente2, instanciar_agente(agente2, LADO_DIREITO))
 
 def avaliar(agente1_type, agente2_type, render=RENDER_AVALIACAO):
     print(f"Alocando {agente1_type} e {agente2_type}...")
     esq_type, esq_agent, dir_type, dir_agent = alocar_lados(agente1_type, agente2_type)
     
-    print(f"Esquerda (first_0): {esq_type}")
-    print(f"Direita (second_0): {dir_type}\n")
+    print(f"Esquerda ({LADO_ESQUERDO}): {esq_type}")
+    print(f"Direita ({LADO_DIREITO}): {dir_type}\n")
 
     render_mode = "human" if render else None
     env = criar_ambiente(
@@ -116,7 +138,7 @@ def avaliar(agente1_type, agente2_type, render=RENDER_AVALIACAO):
 
     for partida in range(1, PARTIDAS_AVALIACAO + 1):
         pontos_esq, pontos_dir, partida_truncada = jogar_partida(
-            env, esq_type, esq_agent, dir_type, dir_agent, seed=SEED + partida, relogio=relogio
+            env, esq_agent, dir_agent, seed=SEED + partida, relogio=relogio
         )
 
         if partida_truncada:
@@ -165,7 +187,7 @@ def avaliar(agente1_type, agente2_type, render=RENDER_AVALIACAO):
 
 if __name__ == "__main__":
     args = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
-    if len(args) < 2:
+    if len(args) != 2:
         print("Uso: python evaluate.py <agente1> <agente2> [--render]")
         print("Opções: rl, genetico, heuristico")
         sys.exit(1)

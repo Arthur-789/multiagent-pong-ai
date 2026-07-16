@@ -31,14 +31,21 @@ def extrair_posicoes(observacao_ram):
     bola_y = int(observacao_ram[IDX_BOLA_Y])
     return jogador_y, oponente_y, bola_y
 
-def escolher_acao(observacao_ram):
+def escolher_acao(observacao_ram, agente_id="second_0"):
     # Regra heurística:
     # Calcula a diferença (dy) entre a altura da bola e a altura da raquete
     # Se a raquete já está alinhada, apenas confirma o saque
     # Se estiver desalinhada, move a raquete na direção da bola
-    jogador_y, oponente_y, bola_y = extrair_posicoes(observacao_ram)
+    
+    bola_y = int(observacao_ram[IDX_BOLA_Y])
+    
+    # Define qual índice da RAM olhar baseado em qual lado estamos jogando
+    if agente_id == "first_0":
+        minha_raquete_y = int(observacao_ram[IDX_JOGADOR_Y]) # 51 (Esquerda)
+    else:
+        minha_raquete_y = int(observacao_ram[IDX_OPONENTE_Y]) # 50 (Direita)
 
-    dy = bola_y - oponente_y
+    dy = bola_y - minha_raquete_y
 
     alinhado = abs(dy) <= TOLERANCIA_ALINHAMENTO
 

@@ -40,7 +40,7 @@ def jogar_partida(env, agente_rl, seed, relogio=None):
                 agente_rl.resetar_estado()
             acao = None if (terminou or truncado) else agente_rl.escolher_acao(observacao, explorar=False)
         else:
-            acao = None if (terminou or truncado) else heuristic_agent.escolher_acao(observacao)
+            acao = None if (terminou or truncado) else heuristic_agent.escolher_acao(observacao, agente_id=agente)
 
         env.step(acao)
         if relogio is not None and agente == NOME_HEURISTICO:

@@ -19,12 +19,13 @@ from config import (
 IDX_PLACAR_ESQ = 14
 IDX_PLACAR_DIR = 13
 
-LADO_ESQUERDO = "first_0"
-LADO_DIREITO = "second_0"
+LADO_DIREITO = "first_0"
+LADO_ESQUERDO = "second_0"
 
 PREFERENCIAS = {
-    "rl": LADO_ESQUERDO,
-    "genetico": LADO_DIREITO,
+    "rl": LADO_DIREITO,
+    "genetico": LADO_ESQUERDO,
+
     "heuristico": None
 }
 
@@ -105,11 +106,12 @@ def alocar_lados(agente1, agente2):
         raise ValueError(f"Não é possível colocar {agente1} contra {agente2} pois ambos requerem o lado {p1}")
 
     if p1 == LADO_DIREITO or p2 == LADO_ESQUERDO:
-        return (agente2, instanciar_agente(agente2, LADO_ESQUERDO), 
-                agente1, instanciar_agente(agente1, LADO_DIREITO))
+        esq_type, dir_type = agente2, agente1
     else:
-        return (agente1, instanciar_agente(agente1, LADO_ESQUERDO), 
-                agente2, instanciar_agente(agente2, LADO_DIREITO))
+        esq_type, dir_type = agente1, agente2
+        
+    return (esq_type, instanciar_agente(esq_type, LADO_ESQUERDO),
+            dir_type, instanciar_agente(dir_type, LADO_DIREITO))
 
 def avaliar(agente1_type, agente2_type, render=RENDER_AVALIACAO):
     print(f"Alocando {agente1_type} e {agente2_type}...")

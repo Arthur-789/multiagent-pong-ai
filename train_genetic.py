@@ -6,9 +6,8 @@ from deap import base, creator, tools, algorithms
 from genetic_agent import AgenteGenetico
 from environment import criar_ambiente
 from rl_agent import AgenteRL
-from config import (
-    RECOMPENSA_PONTO, PUNICAO_PONTO_SOFRIDO, RECOMPENSA_REBATIDA, RECOMPENSA_APROXIMACAO
-)
+import heuristic_agent
+from reward_shaping import RastreadorRecompensa
 
 IDX_BOLA_X = 49
 IDX_BOLA_Y = 54
@@ -17,22 +16,25 @@ IDX_OPONENTE_Y = 50 # Raquete Direita (Genético)
 def eval_agente(individuo):
     agente = AgenteGenetico(individuo)
     
-    # RL na esquerda, Genético na direita
-    agente_rl = AgenteRL()
-    try:
-        # Tenta carregar se existir
-        agente_rl.carregar("checkpoints_tabular/melhor_qtable.npz")
-    except:
-        pass
+    # Sorteia oponente base: RL ou Heurístico
+    oponente_tipo = random.choice(["rl", "heuristico"])
+    
+    if oponente_tipo == "rl":
+        oponente = AgenteRL()
+        try:
+            oponente.carregar("checkpoints_tabular/melhor_qtable.npz")
+        except:
+            pass
+    else:
+        oponente = None # heuristic_agent não tem estado
 
     env = criar_ambiente()
     env.reset()
-    agente_rl.resetar_estado()
+    if oponente_tipo == "rl":
+        oponente.resetar_estado()
 
     fitness_total = 0.0
-    bola_x_anterior = None
-    direcao_x_anterior = 0
-    distancia_anterior = None
+    rastreador = RastreadorRecompensa("second_0")
     
     # 1 rally
     for nome_agente in env.agent_iter():
@@ -43,37 +45,9 @@ def eval_agente(individuo):
             bola_y = int(observacao[IDX_BOLA_Y])
             jogador_y = int(observacao[IDX_OPONENTE_Y])
             
-            recompensa_shape = 0.0
-            rebateu = False
-
-            if recompensa != 0 or bola_x == 0 or bola_y == 0:
-                bola_x_anterior = None
-                direcao_x_anterior = 0
-                distancia_anterior = None
-            elif bola_x_anterior is None:
-                bola_x_anterior = bola_x
-            else:
-                direcao_x = bola_x - bola_x_anterior
-                rebateu = direcao_x_anterior > 0 and direcao_x < 0
-                if direcao_x != 0:
-                    direcao_x_anterior = direcao_x
-                bola_x_anterior = bola_x
-
-            if recompensa > 0:
-                recompensa_shape = RECOMPENSA_PONTO
-            elif recompensa < 0:
-                recompensa_shape = PUNICAO_PONTO_SOFRIDO
-            elif rebateu:
-                recompensa_shape = RECOMPENSA_REBATIDA
-
-            if direcao_x_anterior > 0:
-                distancia = abs(bola_y - jogador_y)
-                if distancia_anterior is not None:
-                    progresso = distancia_anterior - distancia
-                    recompensa_shape += RECOMPENSA_APROXIMACAO * progresso
-                distancia_anterior = distancia
-            else:
-                distancia_anterior = None
+            recompensa_shape, _ = rastreador.atualizar_recompensa(
+                observacao, recompensa, bola_x, bola_y, jogador_y
+            )
 
             fitness_total += recompensa_shape
             
@@ -81,11 +55,14 @@ def eval_agente(individuo):
                 acao = None
             else:
                 acao = agente.escolher_acao(observacao)
-        else: # RL
+        else: # Oponente (first_0)
             if terminou or truncado:
                 acao = None
             else:
-                acao = agente_rl.escolher_acao(observacao, explorar=False)
+                if oponente_tipo == "rl":
+                    acao = oponente.escolher_acao(observacao, explorar=False)
+                else:
+                    acao = heuristic_agent.escolher_acao(observacao, agente_id=nome_agente)
 
         env.step(acao)
 
@@ -94,9 +71,26 @@ def eval_agente(individuo):
             
     env.close()
     
-    # Ajustar para Roleta: garantir que seja > 0 (Shift constante de segurança)
-    # A roleta não aceita negativos. Um shift de 1000 garante positividade.
-    return (fitness_total + 1000.0,)
+    return (fitness_total,)
+
+# Wrapper seguro para roleta que lida com fitness negativos
+def selRouletteSafe(individuals, k):
+    min_fit = min(ind.fitness.values[0] for ind in individuals)
+    orig_fitness = [ind.fitness.values[0] for ind in individuals]
+    
+    shift = 0.0
+    if min_fit <= 0:
+        shift = abs(min_fit) + 1.0
+        
+    for ind in individuals:
+        ind.fitness.values = (ind.fitness.values[0] + shift,)
+        
+    chosen = tools.selRoulette(individuals, k)
+    
+    for i, ind in enumerate(individuals):
+        ind.fitness.values = (orig_fitness[i],)
+        
+    return chosen
 
 creator.create("FitnessMax", base.Fitness, weights=(1.0,))
 creator.create("Individual", list, fitness=creator.FitnessMax)
@@ -109,14 +103,14 @@ toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 toolbox.register("evaluate", eval_agente)
 toolbox.register("mate", tools.cxTwoPoint)
 toolbox.register("mutate", tools.mutFlipBit, indpb=0.01) # Mutação FlipBit
-toolbox.register("select", tools.selRoulette) # Seleção Roleta
+toolbox.register("select", selRouletteSafe) # Seleção Roleta segura
 
 def treinar(pop_size=20, n_gen=10):
     random.seed(42)
     np.random.seed(42)
     
     pop = toolbox.population(n=pop_size)
-    hof = tools.HallOfFame(1) # Elitismo (HallOfFame)
+    hof = tools.HallOfFame(1) # Elitismo
     
     stats = tools.Statistics(lambda ind: ind.fitness.values)
     stats.register("avg", np.mean)
@@ -125,14 +119,12 @@ def treinar(pop_size=20, n_gen=10):
     stats.register("max", np.max)
     
     print("Iniciando Treinamento do Agente Genético...")
-    # Executamos o algoritmo EA simple
     pop, log = algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.2, ngen=n_gen, 
                                    stats=stats, halloffame=hof, verbose=True)
     
-    # Opcional: salvar o melhor indivíduo
     melhor_ind = hof[0]
     np.save("melhor_cromossomo.npy", np.array(melhor_ind, dtype=np.uint8))
-    print("Treinamento finalizado. Melhor fitness absoluto (sem offset):", melhor_ind.fitness.values[0] - 1000.0)
+    print("Treinamento finalizado. Melhor fitness absoluto:", melhor_ind.fitness.values[0])
     
 if __name__ == "__main__":
     treinar()

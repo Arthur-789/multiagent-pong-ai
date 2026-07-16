@@ -1,6 +1,6 @@
-# Atari Pong: Busca Heurística vs. Q-Learning
+# Atari Pong: Busca Heurística vs. Q-Learning vs. Algoritmo Genético
 
-Projeto acadêmico de Inteligência Artificial que compara dois
+Projeto acadêmico de Inteligência Artificial que compara três
 paradigmas de agentes inteligentes no ambiente Pong do
 PettingZoo (Atari), usando observações em modo RAM (vetor de
 128 bytes).
@@ -11,6 +11,9 @@ O objetivo não é obter o melhor agente possível, mas sim comparar:
    estado, objetivo e regras de alinhamento com a bola.
 2. **Agente de aprendizado por reforço (Q-Learning tabular)** — aprende
    a jogar por tentativa e erro, atualizando diretamente uma tabela Q.
+3. **Agente genético (Algoritmo Genético)** — utiliza evolução diferencial
+   (DEAP) para otimizar uma rede neural de uma camada a partir de um
+   cromossomo binário de 12.288 bits.
 
 ## Sobre o jogo
 
@@ -60,6 +63,7 @@ AutoROM --accept-license
 - `pettingzoo[atari]` - ambiente multiagente Atari
 - `autorom` - baixa as ROMs do Atari automaticamente
 - `numpy` - tabela Q, discretização e checkpoints
+- `deap` - framework de algoritmos genéticos usado pelo agente genético
 
 ## Como treinar
 
@@ -79,6 +83,30 @@ temporário é concluído antes de substituir o destino. Ao aumentar
 número. O progresso e o número de rebatidas são impressos no terminal a cada
 10 episódios.
 
+### Treinamento do agente genético
+
+```bash
+python train_genetic.py
+```
+
+O treinamento do agente genético é feito separadamente, pois utiliza o framework
+DEAP ao invés do loop de treinamento do Q-Learning. O algoritmo genético otimiza
+um cromossomo binário de 12.288 bits que codifica uma rede neural de uma camada.
+Cada geração, cada indivíduo da população é avaliado contra o agente heurístico,
+recebendo as mesmas recompensas do agente de RL. O fitness é deslocado em +1000
+para que a seleção por roleta funcione mesmo com valores negativos.
+
+O treinamento usa os seguintes parâmetros do algoritmo evolutivo:
+
+- **População**: 20 indivíduos (padrão)
+- **Gerações**: 10 (padrão)
+- **Crossover**: dois pontos (taxa de 50%)
+- **Mutação**: flip bit com probabilidade de 1% por bit (taxa de 20% por indivíduo)
+- **Seleção**: roleta
+- **Elitismo**: HallOfFame preserva o melhor indivíduo
+
+Ao final, o melhor cromossomo é salvo em `melhor_cromossomo.npy`.
+
 ## Como avaliar
 
 ```bash
@@ -88,6 +116,29 @@ python main.py avaliar
 Carrega o modelo treinado e joga várias partidas do agente de RL contra o
 agente heurístico, exibindo ao final as vitórias, a pontuação média e a taxa de
 vitória de cada agente.
+
+O script `evaluate.py` aceita dois argumentos para comparar qualquer combinação
+de agentes:
+
+```bash
+python evaluate.py <agente1> <agente2> [--render]
+```
+
+Os valores aceitos para `<agente1>` e `<agente2>` são:
+
+- `rl` — agente de Q-Learning
+- `genetico` — agente genético
+- `heuristico` — agente heurístico
+
+Exemplos:
+
+```bash
+python evaluate.py genetico heuristico
+python evaluate.py genetico rl
+python evaluate.py rl genetico --render
+```
+
+A flag `--render` abre uma janela visualizando as partidas.
 
 ## Como jogar
 
@@ -143,8 +194,11 @@ etc.) estão centralizados em **`config.py`**.
 | `heuristic_agent.py` | Agente de busca heurística baseado em posições da RAM           |
 | `training_opponent.py` | Implementação alternativa de oponente com antecipação           |
 | `rl_agent.py`        | Agente de RL: estado discreto, tabela Q e Q-Learning            |
+| `genetic_agent.py`   | Agente genético: decodificação de cromossomo e seleção de ação   |
 | `train.py`           | Loop de treinamento do agente de RL                              |
-| `evaluate.py`        | Compara os dois agentes e imprime as estatísticas finais         |
+| `train_genetic.py`   | Treinamento do agente genético via algoritmo evolutivo (DEAP)    |
+| `evaluate.py`        | Compara dois agentes e imprime as estatísticas finais            |
+| `melhor_cromossomo.npy` | Melhor cromossomo encontrado pelo algoritmo genético          |
 | `jogar.py`           | Permite jogar contra a tabela Q treinada                         |
 | `assistir.py`        | Exibe o agente contra o oponente de treino                       |
 | `checkpoints.py`     | Nomeação e seleção dos checkpoints tabulares                     |
@@ -184,3 +238,20 @@ Q(s,a) = Q(s,a) + alpha * (recompensa + gamma * max(Q(s',a')) - Q(s,a))
 Durante o treinamento, o agente usa uma política epsilon-greedy
 (explora ações aleatórias no início, e gradualmente passa a usar
 mais a melhor ação registrada na tabela conforme o epsilon decai).
+
+### Agente genético (`genetic_agent.py`)
+
+Utiliza um algoritmo genético para otimizar os pesos de uma rede neural de
+uma camada. O cromossomo é representado como um vetor binário de 12.288 bits,
+onde cada peso é codificado com 16 bits em ponto fixo, resultando em 768 pesos
+que formam uma matriz de dimensão (128, 6). O agente recebe os 128 bytes da
+RAM do Atari, normaliza cada byte dividindo por 255.0 e realiza um produto
+escalar com a matriz de pesos. As 6 saídas resultantes correspondem às ações
+do jogo (`NOOP`, `FIRE`, `RIGHT`, `LEFT`, `FIRE_RIGHT`, `FIRE_LEFT`), sendo
+escolhida a de maior pontuação.
+
+O algoritmo genético é executado pelo script `train_genetic.py`, que usa a
+biblioteca DEAP com seleção por roleta, crossover de dois pontos e mutação por
+flip bit. A avaliação de cada indivíduo é feita em um único rally contra o
+agente heurístico, com o mesmo sistema de reward shaping utilizado no treino
+do agente de RL. O melhor cromossomo encontrado é salvo em `melhor_cromossomo.npy`.

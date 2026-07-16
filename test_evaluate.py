@@ -3,8 +3,10 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 
-from evaluate import NOME_HEURISTICO, NOME_RL, jogar_partida
+from evaluate import jogar_partida
 
+NOME_RL = "first_0"
+NOME_HEURISTICO = "second_0"
 
 class AmbienteFalso:
     def __init__(self, turnos):
@@ -43,7 +45,7 @@ class EvaluateTest(unittest.TestCase):
         agente_rl = Mock()
         agente_rl.escolher_acao.return_value = 0
 
-        placar = jogar_partida(env, agente_rl, seed=123)
+        placar = jogar_partida(env, "rl", agente_rl, "heuristico", None, seed=123)
 
         self.assertEqual(placar, (7, 21, False))
 
@@ -58,7 +60,7 @@ class EvaluateTest(unittest.TestCase):
         agente_rl = Mock()
         agente_rl.escolher_acao.return_value = 0
 
-        jogar_partida(env, agente_rl, seed=123)
+        jogar_partida(env, "rl", agente_rl, "heuristico", None, seed=123)
 
         self.assertEqual(agente_rl.resetar_estado.call_count, 2)
 
@@ -68,7 +70,7 @@ class EvaluateTest(unittest.TestCase):
         env = AmbienteFalso(turnos)
         agente_rl = Mock()
 
-        resultado = jogar_partida(env, agente_rl, seed=123)
+        resultado = jogar_partida(env, "rl", agente_rl, "heuristico", None, seed=123)
 
         self.assertEqual(resultado, (3, 4, True))
 

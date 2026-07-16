@@ -5,7 +5,6 @@ from deap import base, creator, tools, algorithms
 
 from genetic_agent import AgenteGenetico
 from environment import criar_ambiente
-from rl_agent import AgenteRL
 import heuristic_agent
 from config import (
     RECOMPENSA_PONTO, PUNICAO_PONTO_SOFRIDO, RECOMPENSA_REBATIDA, RECOMPENSA_APROXIMACAO
@@ -99,25 +98,14 @@ def eval_agente(individuo):
     agente = AgenteGenetico(individuo)
     env = criar_ambiente()
     
-    # 1) Avalia contra o Agente RL
-    oponente_rl = AgenteRL()
-    try:
-        oponente_rl.carregar("checkpoints_tabular/melhor_qtable.npz")
-    except:
-        pass
-    fitness_rl = avaliar_rally(agente, oponente_rl, "rl", env)
-    
-    # 2) Avalia contra o Agente Heurístico
+    # Avalia apenas contra o Agente Heurístico (Baseline)
     fitness_heuristico = avaliar_rally(agente, None, "heuristico", env)
     
     env.close()
     
-    # Fitness final é a soma das duas avaliações
-    fitness_total = fitness_rl + fitness_heuristico
-    
     # Ajustar para Roleta: garantir que seja > 0 (Shift constante de segurança)
-    # A roleta não aceita negativos. Como são 2 rallies, usamos +2000.0.
-    return (fitness_total + 2000.0,)
+    # A roleta não aceita negativos. Como é 1 rally, usamos +1000.0.
+    return (fitness_heuristico + 1000.0,)
 
 creator.create("FitnessMax", base.Fitness, weights=(1.0,))
 creator.create("Individual", list, fitness=creator.FitnessMax)
@@ -153,7 +141,7 @@ def treinar(pop_size=20, n_gen=10):
     # Opcional: salvar o melhor indivíduo
     melhor_ind = hof[0]
     np.save("melhor_cromossomo.npy", np.array(melhor_ind, dtype=np.uint8))
-    print("Treinamento finalizado. Melhor fitness absoluto (sem offset):", melhor_ind.fitness.values[0] - 2000.0)
+    print("Treinamento finalizado. Melhor fitness absoluto (sem offset):", melhor_ind.fitness.values[0] - 1000.0)
     
 if __name__ == "__main__":
     treinar()

@@ -10,7 +10,6 @@ from environment import criar_ambiente
 from evaluate import jogar_partida
 from rl_agent import AgenteRL
 import heuristic_agent
-from reward_shaping import RastreadorRecompensa
 from checkpoints import caminho_checkpoint, checkpoint_mais_recente
 from config import (
     TREINO_EPISODIOS,
@@ -120,7 +119,9 @@ def treinar(render=RENDER_TREINO):
         pontos_sofridos = 0
         ultimo_estado_rl = {}
         ultima_acao_rl = {}
-        rastreador = RastreadorRecompensa(NOME_RL)
+        bola_x_anterior = None
+        direcao_x_anterior = 0
+        distancia_anterior = None
         rebateu_no_rally = False
 
         for agente in env.agent_iter():
@@ -134,20 +135,42 @@ def treinar(render=RENDER_TREINO):
                 bola_x = int(observacao[IDX_BOLA_X])
                 bola_y = int(observacao[IDX_BOLA_Y])
                 jogador_y = int(observacao[IDX_JOGADOR_Y])
-                
-                recompensa_treino, rebateu = rastreador.atualizar_recompensa(
-                    observacao, recompensa, bola_x, bola_y, jogador_y
-                )
+                rebateu = False
+                if recompensa != 0 or bola_x == 0 or bola_y == 0:
+                    bola_x_anterior = None
+                    direcao_x_anterior = 0
+                    distancia_anterior = None
+                elif bola_x_anterior is None:
+                    bola_x_anterior = bola_x
+                else:
+                    direcao_x = bola_x - bola_x_anterior
+                    rebateu = direcao_x_anterior > 0 and direcao_x < 0
+                    if direcao_x != 0:
+                        direcao_x_anterior = direcao_x
+                    bola_x_anterior = bola_x
 
+                recompensa_treino = 0.0
                 if recompensa > 0:
                     pontos_feitos += 1
+                    recompensa_treino = RECOMPENSA_PONTO
                     rebateu_no_rally = False
                 elif recompensa < 0:
+                    recompensa_treino = PUNICAO_PONTO_SOFRIDO
                     pontos_sofridos += 1
                     rebateu_no_rally = False
                 elif rebateu:
+                    recompensa_treino = RECOMPENSA_REBATIDA
                     total_rebatidas += 1
                     rebateu_no_rally = True
+
+                if direcao_x_anterior > 0:
+                    distancia = abs(bola_y - jogador_y)
+                    if distancia_anterior is not None:
+                        progresso = distancia_anterior - distancia
+                        recompensa_treino += RECOMPENSA_APROXIMACAO * progresso
+                    distancia_anterior = distancia
+                else:
+                    distancia_anterior = None
 
                 # Aprende com o resultado do passo anterior
                 if agente in ultimo_estado_rl:

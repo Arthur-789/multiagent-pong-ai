@@ -7,47 +7,70 @@ from genetic_agent import AgenteGenetico
 from environment import criar_ambiente
 from rl_agent import AgenteRL
 import heuristic_agent
-from reward_shaping import RastreadorRecompensa
+from config import (
+    RECOMPENSA_PONTO, PUNICAO_PONTO_SOFRIDO, RECOMPENSA_REBATIDA, RECOMPENSA_APROXIMACAO
+)
 
 IDX_BOLA_X = 49
 IDX_BOLA_Y = 54
 IDX_OPONENTE_Y = 50 # Raquete Direita (Genético)
 
-def eval_agente(individuo):
-    agente = AgenteGenetico(individuo)
-    
-    # Sorteia oponente base: RL ou Heurístico
-    oponente_tipo = random.choice(["rl", "heuristico"])
-    
-    if oponente_tipo == "rl":
-        oponente = AgenteRL()
-        try:
-            oponente.carregar("checkpoints_tabular/melhor_qtable.npz")
-        except:
-            pass
-    else:
-        oponente = None # heuristic_agent não tem estado
-
-    env = criar_ambiente()
+def avaliar_rally(agente, oponente, oponente_tipo, env):
+    """
+    Avalia o agente genético em 1 rally contra o oponente especificado.
+    Retorna o fitness_total do rally (usando reward shaping copiado de train.py).
+    """
     env.reset()
-    if oponente_tipo == "rl":
+    if oponente_tipo == "rl" and oponente is not None:
         oponente.resetar_estado()
 
     fitness_total = 0.0
-    rastreador = RastreadorRecompensa("second_0")
+    bola_x_anterior = None
+    direcao_x_anterior = 0
+    distancia_anterior = None
     
-    # 1 rally
     for nome_agente in env.agent_iter():
         observacao, recompensa, terminou, truncado, _ = env.last()
 
-        if nome_agente == "second_0": # Genético
+        if nome_agente == "second_0": # Genético (Direita)
             bola_x = int(observacao[IDX_BOLA_X])
             bola_y = int(observacao[IDX_BOLA_Y])
             jogador_y = int(observacao[IDX_OPONENTE_Y])
             
-            recompensa_shape, _ = rastreador.atualizar_recompensa(
-                observacao, recompensa, bola_x, bola_y, jogador_y
-            )
+            recompensa_shape = 0.0
+            rebateu = False
+
+            if recompensa != 0 or bola_x == 0 or bola_y == 0:
+                bola_x_anterior = None
+                direcao_x_anterior = 0
+                distancia_anterior = None
+            elif bola_x_anterior is None:
+                bola_x_anterior = bola_x
+            else:
+                direcao_x = bola_x - bola_x_anterior
+                # O Genético está na direita, então a bola se aproxima dele quando direcao_x > 0
+                # Ele rebate se a bola estava indo para a direita (>0) e agora vai para a esquerda (<0)
+                rebateu = direcao_x_anterior > 0 and direcao_x < 0
+                if direcao_x != 0:
+                    direcao_x_anterior = direcao_x
+                bola_x_anterior = bola_x
+
+            if recompensa > 0:
+                recompensa_shape = RECOMPENSA_PONTO
+            elif recompensa < 0:
+                recompensa_shape = PUNICAO_PONTO_SOFRIDO
+            elif rebateu:
+                recompensa_shape = RECOMPENSA_REBATIDA
+
+            # Distância de aproximação quando a bola vem na direção da raquete (direita, >0)
+            if direcao_x_anterior > 0:
+                distancia = abs(bola_y - jogador_y)
+                if distancia_anterior is not None:
+                    progresso = distancia_anterior - distancia
+                    recompensa_shape += RECOMPENSA_APROXIMACAO * progresso
+                distancia_anterior = distancia
+            else:
+                distancia_anterior = None
 
             fitness_total += recompensa_shape
             
@@ -55,42 +78,46 @@ def eval_agente(individuo):
                 acao = None
             else:
                 acao = agente.escolher_acao(observacao)
-        else: # Oponente (first_0)
+        else: # Oponente (Esquerda, first_0)
             if terminou or truncado:
                 acao = None
             else:
-                if oponente_tipo == "rl":
+                if oponente_tipo == "rl" and oponente is not None:
                     acao = oponente.escolher_acao(observacao, explorar=False)
                 else:
                     acao = heuristic_agent.escolher_acao(observacao, agente_id=nome_agente)
 
         env.step(acao)
 
+        # Fim do rally
         if recompensa != 0:
             break
             
+    return fitness_total
+
+def eval_agente(individuo):
+    agente = AgenteGenetico(individuo)
+    env = criar_ambiente()
+    
+    # 1) Avalia contra o Agente RL
+    oponente_rl = AgenteRL()
+    try:
+        oponente_rl.carregar("checkpoints_tabular/melhor_qtable.npz")
+    except:
+        pass
+    fitness_rl = avaliar_rally(agente, oponente_rl, "rl", env)
+    
+    # 2) Avalia contra o Agente Heurístico
+    fitness_heuristico = avaliar_rally(agente, None, "heuristico", env)
+    
     env.close()
     
-    return (fitness_total,)
-
-# Wrapper seguro para roleta que lida com fitness negativos
-def selRouletteSafe(individuals, k):
-    min_fit = min(ind.fitness.values[0] for ind in individuals)
-    orig_fitness = [ind.fitness.values[0] for ind in individuals]
+    # Fitness final é a soma das duas avaliações
+    fitness_total = fitness_rl + fitness_heuristico
     
-    shift = 0.0
-    if min_fit <= 0:
-        shift = abs(min_fit) + 1.0
-        
-    for ind in individuals:
-        ind.fitness.values = (ind.fitness.values[0] + shift,)
-        
-    chosen = tools.selRoulette(individuals, k)
-    
-    for i, ind in enumerate(individuals):
-        ind.fitness.values = (orig_fitness[i],)
-        
-    return chosen
+    # Ajustar para Roleta: garantir que seja > 0 (Shift constante de segurança)
+    # A roleta não aceita negativos. Como são 2 rallies, usamos +2000.0.
+    return (fitness_total + 2000.0,)
 
 creator.create("FitnessMax", base.Fitness, weights=(1.0,))
 creator.create("Individual", list, fitness=creator.FitnessMax)
@@ -103,14 +130,14 @@ toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 toolbox.register("evaluate", eval_agente)
 toolbox.register("mate", tools.cxTwoPoint)
 toolbox.register("mutate", tools.mutFlipBit, indpb=0.01) # Mutação FlipBit
-toolbox.register("select", selRouletteSafe) # Seleção Roleta segura
+toolbox.register("select", tools.selRoulette) # Seleção Roleta
 
 def treinar(pop_size=20, n_gen=10):
     random.seed(42)
     np.random.seed(42)
     
     pop = toolbox.population(n=pop_size)
-    hof = tools.HallOfFame(1) # Elitismo
+    hof = tools.HallOfFame(1) # Elitismo (HallOfFame)
     
     stats = tools.Statistics(lambda ind: ind.fitness.values)
     stats.register("avg", np.mean)
@@ -119,12 +146,14 @@ def treinar(pop_size=20, n_gen=10):
     stats.register("max", np.max)
     
     print("Iniciando Treinamento do Agente Genético...")
+    # Executamos o algoritmo EA simple
     pop, log = algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.2, ngen=n_gen, 
                                    stats=stats, halloffame=hof, verbose=True)
     
+    # Opcional: salvar o melhor indivíduo
     melhor_ind = hof[0]
     np.save("melhor_cromossomo.npy", np.array(melhor_ind, dtype=np.uint8))
-    print("Treinamento finalizado. Melhor fitness absoluto:", melhor_ind.fitness.values[0])
+    print("Treinamento finalizado. Melhor fitness absoluto (sem offset):", melhor_ind.fitness.values[0] - 2000.0)
     
 if __name__ == "__main__":
     treinar()

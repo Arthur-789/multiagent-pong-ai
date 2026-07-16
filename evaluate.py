@@ -35,20 +35,27 @@ class AgenteHeuristicoWrapper:
     def resetar_estado(self):
         pass
 
-    def escolher_acao(self, observacao, explorar=False):
+    def escolher_acao(self, observacao):
         return heuristic_agent.escolher_acao(observacao, agente_id=self.agente_id)
+
+class AgenteRLWrapper:
+    def __init__(self, agente):
+        self.agente = agente
+
+    def resetar_estado(self):
+        self.agente.resetar_estado()
+
+    def escolher_acao(self, observacao):
+        return self.agente.escolher_acao(observacao, explorar=False)
 
 def instanciar_agente(tipo, agente_id):
     if tipo == "rl":
         agente = AgenteRL()
         agente.carregar("checkpoints_tabular/melhor_qtable.npz")
-        return agente
+        return AgenteRLWrapper(agente)
     elif tipo == "genetico":
         cromossomo = np.load("melhor_cromossomo.npy")
-        agente = AgenteGenetico(cromossomo)
-        # Genético não tem resetar_estado originalmente, então criamos um mock
-        agente.resetar_estado = lambda: None
-        return agente
+        return AgenteGenetico(cromossomo)
     elif tipo == "heuristico":
         return AgenteHeuristicoWrapper(agente_id)
     else:
@@ -72,17 +79,12 @@ def jogar_partida(env, esq_agent, dir_agent, seed, relogio=None):
         if terminou or truncado:
             acao = None
         else:
-            if nome_agente == LADO_ESQUERDO:
-                if recompensa != 0:
-                    esq_agent.resetar_estado()
-                acao = esq_agent.escolher_acao(observacao, explorar=False) if hasattr(esq_agent, 'escolher_acao_explorar') else esq_agent.escolher_acao(observacao)
-                # Na verdade, rl usa explorar=False, genetico usa nada, wrapper aceita explorar.
-                # Vamos padronizar: o wrapper pode ignorar kwargs. O RL requer explorar=False.
-                # Como o Genético não aceita kwargs, precisamos lidar com isso.
-            else:
-                if recompensa != 0:
-                    dir_agent.resetar_estado()
-                acao = dir_agent.escolher_acao(observacao, explorar=False) if hasattr(dir_agent, 'escolher_acao_explorar') else dir_agent.escolher_acao(observacao)
+            agente_atual = esq_agent if nome_agente == LADO_ESQUERDO else dir_agent
+            
+            if recompensa != 0:
+                agente_atual.resetar_estado()
+            
+            acao = agente_atual.escolher_acao(observacao)
 
         env.step(acao)
         if relogio is not None and nome_agente == LADO_ESQUERDO:
@@ -102,14 +104,10 @@ def alocar_lados(agente1, agente2):
     if p1 is not None and p2 is not None and p1 == p2:
         raise ValueError(f"Não é possível colocar {agente1} contra {agente2} pois ambos requerem o lado {p1}")
 
-    if p1 == LADO_ESQUERDO or p2 == LADO_DIREITO:
-        return (agente1, instanciar_agente(agente1, LADO_ESQUERDO), 
-                agente2, instanciar_agente(agente2, LADO_DIREITO))
-    elif p1 == LADO_DIREITO or p2 == LADO_ESQUERDO:
+    if p1 == LADO_DIREITO or p2 == LADO_ESQUERDO:
         return (agente2, instanciar_agente(agente2, LADO_ESQUERDO), 
                 agente1, instanciar_agente(agente1, LADO_DIREITO))
     else:
-        # Ambos None (heuristico vs heuristico)
         return (agente1, instanciar_agente(agente1, LADO_ESQUERDO), 
                 agente2, instanciar_agente(agente2, LADO_DIREITO))
 

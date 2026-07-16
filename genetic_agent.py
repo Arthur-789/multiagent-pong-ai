@@ -37,3 +37,7 @@ class AgenteGenetico:
         scores = np.dot(obs_float, self.pesos)
         
         return int(np.argmax(scores))
+
+    def resetar_estado(self):
+        pass
+

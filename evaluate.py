@@ -16,8 +16,8 @@ from config import (
     SEED,
 )
 
-IDX_PLACAR_ESQ = 14
-IDX_PLACAR_DIR = 13
+IDX_PLACAR_ESQ = 13
+IDX_PLACAR_DIR = 14
 
 LADO_DIREITO = "first_0"
 LADO_ESQUERDO = "second_0"

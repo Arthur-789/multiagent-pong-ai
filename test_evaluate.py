@@ -26,8 +26,8 @@ class AmbienteFalso:
             self.turno_atual
         )
         observacao = np.zeros(128, dtype=np.uint8)
-        observacao[14] = pontos_esq
-        observacao[13] = pontos_dir
+        observacao[13] = pontos_esq
+        observacao[14] = pontos_dir
         return observacao, recompensa, terminou, truncado, {}
 
     def step(self, acao):
@@ -64,7 +64,7 @@ class EvaluateTest(unittest.TestCase):
 
         jogar_partida(env, agente_esq, agente_dir, seed=123)
 
-        self.assertEqual(agente_esq.resetar_estado.call_count, 2)
+        self.assertEqual(agente_dir.resetar_estado.call_count, 2)
         # dir agent didn't receive a reward != 0 when it was its turn, 
         # wait, the loop processes rl, then heuristico, then rl.
         # the third turn rl gets reward -1, so it resets state.

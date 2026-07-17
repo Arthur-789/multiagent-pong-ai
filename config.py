@@ -21,6 +21,14 @@ RECOMPENSA_REBATIDA = 5.0  # Recompensa imediata ao devolver a bola
 RECOMPENSA_PONTO = 25.0  # Recompensa rara por vencer o oponente de treino
 PUNICAO_PONTO_SOFRIDO = -25.0  # Peso simétrico ao ponto marcado
 
+# Treinamento do agente genético
+GA_POP_SIZE = 50  # Tamanho da população
+GA_N_GEN = 30  # Número de gerações
+GA_CXPB = 0.6  # Probabilidade de crossover por par de indivíduos
+GA_MUTPB = 0.3  # Probabilidade de mutação por indivíduo
+GA_RALLIES_POR_AVALIACAO = 5  # Rallies (com seeds diferentes) usados para calcular o fitness de 1 indivíduo
+GA_CAMINHO_CHECKPOINT = "melhor_cromossomo.npy"  # Melhor cromossomo encontrado
+
 # Avaliação
 PARTIDAS_AVALIACAO = 20  # Quantas partidas rodar na comparação final
 PROBABILIDADE_ACAO_REPETIDA_AVALIACAO = 0.25

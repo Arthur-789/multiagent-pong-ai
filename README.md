@@ -133,6 +133,10 @@ Os valores aceitos para `<agente1>` e `<agente2>` são:
 - `genetico` — agente genético
 - `heuristico` — agente heurístico
 
+Como RL e genético foram treinados em lados fixos, `eval rl rl` e
+`eval genetico genetico` são rejeitados. O baseline se adapta aos dois lados,
+portanto `eval heuristico heuristico` é válido.
+
 Exemplos:
 
 ```bash
@@ -142,6 +146,10 @@ python main.py eval rl genetico --render
 ```
 
 A flag `--render` abre uma janela visualizando as partidas.
+
+Quando o melhor artefato treinado de um tipo não existe no caminho definido em
+`config.py`, `eval` informa o caminho ausente e orienta a executar
+`python main.py train <tipo>`; nenhum checkpoint alternativo é carregado.
 
 ## Como jogar
 
@@ -159,6 +167,8 @@ Controles:
 No modo jogável, o agente permanece no lado para o qual foi treinado; por isso,
 o humano joga à direita contra o genético e à esquerda contra os demais. A
 execução respeita o limite `FPS_JOGO` definido em `config.py`.
+Assim como em `eval`, a ausência do melhor artefato treinado produz um erro com
+a instrução de treinamento, sem fallback para outro checkpoint.
 
 ## Configurações
 

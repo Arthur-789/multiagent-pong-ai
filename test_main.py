@@ -25,6 +25,12 @@ class MainTest(unittest.TestCase):
 
         avaliar.assert_called_once_with("rl", "genetico", render=True)
 
+    @patch("main.avaliar_agentes")
+    def test_eval_permite_dois_baselines_heuristicos(self, avaliar):
+        main.main(["eval", "heuristico", "heuristico"])
+
+        avaliar.assert_called_once_with("heuristico", "heuristico", render=False)
+
     def test_eval_rejeita_agentes_treinados_que_exigem_o_mesmo_lado(self):
         for tipo in ("rl", "genetico"):
             with self.subTest(tipo=tipo):
@@ -38,6 +44,14 @@ class MainTest(unittest.TestCase):
         main.main(["play", "heuristico"])
 
         jogar_contra.assert_called_once_with("heuristico")
+
+    def test_rejeita_aliases_da_interface_antiga(self):
+        for alias in ("treinar", "avaliar", "jogar", "assistir"):
+            with self.subTest(alias=alias):
+                with self.assertRaises(SystemExit) as erro:
+                    main.main([alias])
+
+                self.assertNotEqual(erro.exception.code, 0)
 
 
 if __name__ == "__main__":

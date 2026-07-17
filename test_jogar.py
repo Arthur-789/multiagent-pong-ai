@@ -17,6 +17,13 @@ class JogarTest(unittest.TestCase):
         with self.assertRaisesRegex(FileNotFoundError, "python main.py train rl"):
             carregar_agente("rl", LADO_DIREITO)
 
+    @patch("agents.os.path.exists", return_value=False)
+    def test_falha_quando_artefato_genetico_padrao_nao_existe(self, _):
+        with self.assertRaisesRegex(
+            FileNotFoundError, "python main.py train genetico"
+        ):
+            carregar_agente("genetico", LADO_ESQUERDO)
+
 
 if __name__ == "__main__":
     unittest.main()

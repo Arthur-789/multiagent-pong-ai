@@ -35,7 +35,7 @@ def _ler_acao_humana(permitir_movimento=True):
 
 def jogar(tipo):
     lado_humano, lado_agente = lados_para_jogo(tipo)
-    agente_modelo = carregar_agente(tipo, lado_agente)
+    agente_adversario = carregar_agente(tipo, lado_agente)
     render_mode = "human"
     env = criar_ambiente(render_mode=render_mode)
 
@@ -44,7 +44,7 @@ def jogar(tipo):
 
     try:
         env.reset(seed=SEED)
-        agente_modelo.resetar_estado()
+        agente_adversario.resetar_estado()
         env.render()
         relogio = pygame.time.Clock()
         fps = FPS_JOGO
@@ -62,7 +62,7 @@ def jogar(tipo):
                         permitir_movimento
                     )
                 else:
-                    acao = None if (terminou or truncado) else agente_modelo.escolher_acao(observacao)
+                    acao = None if (terminou or truncado) else agente_adversario.escolher_acao(observacao)
 
                 env.step(acao)
                 if agente == lado_humano:
@@ -70,7 +70,7 @@ def jogar(tipo):
                     relogio.tick(fps)
 
             env.reset()
-            agente_modelo.resetar_estado()
+            agente_adversario.resetar_estado()
             env.render()
             passos_humano = 0
     except KeyboardInterrupt:

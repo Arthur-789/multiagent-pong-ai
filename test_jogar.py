@@ -1,14 +1,21 @@
 import unittest
 from unittest.mock import patch
 
-from config import CAMINHO_MELHOR_CHECKPOINT
-from jogar import resolver_modelo
+from agents import LADO_DIREITO, LADO_ESQUERDO, carregar_agente, lados_para_jogo
 
 
 class JogarTest(unittest.TestCase):
-    @patch("jogar.os.path.exists", return_value=True)
-    def test_usa_melhor_checkpoint_por_padrao(self, _):
-        self.assertEqual(resolver_modelo(None), CAMINHO_MELHOR_CHECKPOINT)
+    def test_preserva_lado_de_treinamento_do_adversario(self):
+        self.assertEqual(lados_para_jogo("rl"), (LADO_ESQUERDO, LADO_DIREITO))
+        self.assertEqual(lados_para_jogo("genetico"), (LADO_DIREITO, LADO_ESQUERDO))
+        self.assertEqual(
+            lados_para_jogo("heuristico"), (LADO_ESQUERDO, LADO_DIREITO)
+        )
+
+    @patch("agents.os.path.exists", return_value=False)
+    def test_falha_quando_artefato_padrao_nao_existe(self, _):
+        with self.assertRaisesRegex(FileNotFoundError, "python main.py train rl"):
+            carregar_agente("rl", LADO_DIREITO)
 
 
 if __name__ == "__main__":

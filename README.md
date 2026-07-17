@@ -69,7 +69,7 @@ AutoROM --accept-license
 ## Como treinar
 
 ```bash
-python main.py treinar
+python main.py train rl
 ```
 
 Isso treina o agente de RL contra o mesmo agente heurístico usado na avaliação,
@@ -87,19 +87,12 @@ número. O progresso e o número de rebatidas são impressos no terminal a cada
 ### Treinamento do agente genético
 
 ```bash
-python train_genetic.py
+python main.py train genetico
 ```
 
 Os hiperparâmetros do algoritmo evolutivo (população, gerações, taxas de
 crossover/mutação, rallies por avaliação e caminho do checkpoint) ficam
 centralizados em **`config.py`**, junto com os demais parâmetros do projeto.
-Também é possível sobrescrever qualquer um desses valores pontualmente via
-linha de comando, sem editar `config.py`:
-
-```bash
-python train_genetic.py --pop-size 50 --n-gen 50 --cxpb 0.6 --mutpb 0.3 \
-    --checkpoint-path melhor_cromossomo.npy
-```
 
 O treinamento do agente genético é feito separadamente, pois utiliza o framework
 DEAP ao invés do loop de treinamento do Q-Learning. O algoritmo genético otimiza
@@ -122,25 +115,17 @@ O treinamento usa os seguintes parâmetros do algoritmo evolutivo:
 - **Elitismo**: o melhor indivíduo (HallOfFame) é preservado e reinserido na população caso toda a geração seguinte regrida
 
 A cada geração, o melhor cromossomo encontrado até então é salvo em
-`melhor_cromossomo.npy` (`GA_CAMINHO_CHECKPOINT`, ou no caminho definido em
-`--checkpoint-path`), permitindo interromper o treino sem perder o progresso.
+`melhor_cromossomo.npy` (`GA_CAMINHO_CHECKPOINT`), permitindo interromper o
+treino sem perder o progresso.
 
 ## Como avaliar
 
 ```bash
-python main.py avaliar
+python main.py eval <agente1> <agente2> [--render]
 ```
 
-Carrega o modelo treinado e joga várias partidas do agente de RL contra o
-agente heurístico, exibindo ao final as vitórias, a pontuação média e a taxa de
-vitória de cada agente.
-
-O script `evaluate.py` aceita dois argumentos para comparar qualquer combinação
-de agentes:
-
-```bash
-python evaluate.py <agente1> <agente2> [--render]
-```
+Carrega os artefatos padrão dos tipos treinados e joga várias partidas entre
+os agentes, exibindo ao final vitórias, pontuação média e taxa de vitória.
 
 Os valores aceitos para `<agente1>` e `<agente2>` são:
 
@@ -151,9 +136,9 @@ Os valores aceitos para `<agente1>` e `<agente2>` são:
 Exemplos:
 
 ```bash
-python evaluate.py genetico heuristico
-python evaluate.py genetico rl
-python evaluate.py rl genetico --render
+python main.py eval genetico heuristico
+python main.py eval genetico rl
+python main.py eval rl genetico --render
 ```
 
 A flag `--render` abre uma janela visualizando as partidas.
@@ -161,13 +146,7 @@ A flag `--render` abre uma janela visualizando as partidas.
 ## Como jogar
 
 ```bash
-python main.py jogar
-```
-
-Ou diretamente:
-
-```bash
-python jogar.py
+python main.py play <rl|genetico|heuristico>
 ```
 
 Controles:
@@ -177,25 +156,9 @@ Controles:
 - o saque é automático
 - `ESC` sai
 
-No modo jogável, a execução respeita o limite `FPS_JOGO` definido em
-`config.py`, para que a velocidade não dependa do desempenho da CPU.
-
-## Como assistir ao modelo
-
-Para visualizar um modelo jogando contra o mesmo oponente usado no treino:
-
-```bash
-python main.py assistir
-```
-
-Esse modo não atualiza a tabela Q nem executa etapas de treinamento. Cada partida
-vai até o encerramento normal do Pong em 21 pontos, imprime o placar, reinicia
-automaticamente e respeita o limite `FPS_JOGO` definido em `config.py`. Use
-`ESC` para fechar.
-
-Como o placar do Pong não é estritamente de soma zero por causa
-da penalidade de saque demorado, é possível uma partida terminar com
-os dois agentes tendo recompensa negativa.
+No modo jogável, o agente permanece no lado para o qual foi treinado; por isso,
+o humano joga à direita contra o genético e à esquerda contra os demais. A
+execução respeita o limite `FPS_JOGO` definido em `config.py`.
 
 ## Configurações
 
@@ -214,14 +177,14 @@ em **`config.py`**.
 | `training_opponent.py` | Implementação alternativa de oponente com antecipação           |
 | `rl_agent.py`        | Agente de RL: estado discreto, tabela Q e Q-Learning            |
 | `genetic_agent.py`   | Agente genético: decodificação de cromossomo e seleção de ação   |
+| `agents.py`          | Tipos de agente, artefatos padrão e preferências de lado          |
 | `train.py`           | Loop de treinamento do agente de RL                              |
 | `train_genetic.py`   | Treinamento do agente genético via algoritmo evolutivo (DEAP)    |
 | `evaluate.py`        | Compara dois agentes e imprime as estatísticas finais            |
 | `melhor_cromossomo.npy` | Melhor cromossomo encontrado pelo algoritmo genético          |
-| `jogar.py`           | Permite jogar contra a tabela Q treinada                         |
-| `assistir.py`        | Exibe o agente contra o oponente de treino                       |
+| `jogar.py`           | Permite jogar contra qualquer tipo de agente                     |
 | `checkpoints.py`     | Nomeação e seleção dos checkpoints tabulares                     |
-| `main.py`            | Ponto de entrada dos comandos do projeto                         |
+| `main.py`            | Única interface de linha de comando do projeto                   |
 | `requirements.txt`   | Dependências do projeto                                          |
 
 ## Explicação resumida dos agentes

@@ -1,5 +1,3 @@
-import sys
-import argparse
 import random
 import numpy as np
 from deap import base, creator, tools
@@ -215,41 +213,3 @@ def treinar(pop_size=GA_POP_SIZE, n_gen=GA_N_GEN, cxpb=GA_CXPB, mutpb=GA_MUTPB,
 
 def _salvar_checkpoint(individuo, caminho):
     np.save(caminho, np.array(individuo, dtype=np.uint8))
-
-
-def _parse_args():
-    parser = argparse.ArgumentParser(
-        description="Treina o agente genético do Pong via DEAP."
-    )
-    parser.add_argument(
-        "--pop-size", type=int, default=GA_POP_SIZE,
-        help=f"Tamanho da população (padrão: config.GA_POP_SIZE = {GA_POP_SIZE})",
-    )
-    parser.add_argument(
-        "--n-gen", type=int, default=GA_N_GEN,
-        help=f"Número de gerações (padrão: config.GA_N_GEN = {GA_N_GEN})",
-    )
-    parser.add_argument(
-        "--cxpb", type=float, default=GA_CXPB,
-        help=f"Probabilidade de crossover por par de indivíduos (padrão: config.GA_CXPB = {GA_CXPB})",
-    )
-    parser.add_argument(
-        "--mutpb", type=float, default=GA_MUTPB,
-        help=f"Probabilidade de mutação por indivíduo (padrão: config.GA_MUTPB = {GA_MUTPB})",
-    )
-    parser.add_argument(
-        "--checkpoint-path", type=str, default=GA_CAMINHO_CHECKPOINT,
-        help=f"Caminho onde salvar o melhor cromossomo (padrão: config.GA_CAMINHO_CHECKPOINT = '{GA_CAMINHO_CHECKPOINT}')",
-    )
-    return parser.parse_args()
-
-
-if __name__ == "__main__":
-    args = _parse_args()
-    treinar(
-        pop_size=args.pop_size,
-        n_gen=args.n_gen,
-        cxpb=args.cxpb,
-        mutpb=args.mutpb,
-        checkpoint_path=args.checkpoint_path,
-    )

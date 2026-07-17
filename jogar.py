@@ -1,38 +1,18 @@
-"""Joga Pong humano vs modelo treinado."""
-
-import os
-import sys
+"""Joga Pong humano contra um dos tipos de agente disponíveis."""
 
 import pygame
 
-from checkpoints import checkpoint_mais_recente
+from agents import (
+    carregar_agente,
+    lados_para_jogo,
+)
 from config import (
-    CAMINHO_MELHOR_CHECKPOINT,
-    CAMINHO_MODELO,
-    DIRETORIO_CHECKPOINTS,
     FPS_JOGO,
     SEED,
 )
 from environment import criar_ambiente
-from rl_agent import AgenteRL
 
-NOME_HUMANO = "second_0"
-NOME_MODELO = "first_0"
 INTERVALO_MOVIMENTO_HUMANO = 3
-
-
-def resolver_modelo(argumento):
-    if not argumento:
-        if os.path.exists(CAMINHO_MELHOR_CHECKPOINT):
-            return CAMINHO_MELHOR_CHECKPOINT
-        return checkpoint_mais_recente(DIRETORIO_CHECKPOINTS) or CAMINHO_MODELO
-    if os.path.exists(argumento):
-        return argumento
-    if not argumento.endswith(".npz"):
-        candidato = f"{argumento}.npz"
-        if os.path.exists(candidato):
-            return candidato
-    return argumento
 
 
 def _ler_acao_humana(permitir_movimento=True):
@@ -53,15 +33,13 @@ def _ler_acao_humana(permitir_movimento=True):
     return 1
 
 
-def jogar(modelo=None):
-    caminho_modelo = resolver_modelo(modelo)
+def jogar(tipo):
+    lado_humano, lado_agente = lados_para_jogo(tipo)
+    agente_modelo = carregar_agente(tipo, lado_agente)
     render_mode = "human"
     env = criar_ambiente(render_mode=render_mode)
 
-    agente_modelo = AgenteRL()
-    agente_modelo.carregar(caminho_modelo)
-
-    print(f"Jogando contra o modelo: {caminho_modelo}")
+    print(f"Jogando contra o agente: {tipo}")
     print("Controles: W/↑ sobe, S/↓ desce, saque automático, ESC sai.")
 
     try:
@@ -75,7 +53,7 @@ def jogar(modelo=None):
             for agente in env.agent_iter():
                 observacao, recompensa, terminou, truncado, _ = env.last()
 
-                if agente == NOME_HUMANO:
+                if agente == lado_humano:
                     passos_humano += 1
                     permitir_movimento = (
                         passos_humano % INTERVALO_MOVIMENTO_HUMANO == 0
@@ -84,12 +62,10 @@ def jogar(modelo=None):
                         permitir_movimento
                     )
                 else:
-                    acao = None if (terminou or truncado) else agente_modelo.escolher_acao(
-                        observacao, explorar=False
-                    )
+                    acao = None if (terminou or truncado) else agente_modelo.escolher_acao(observacao)
 
                 env.step(acao)
-                if agente == NOME_HUMANO:
+                if agente == lado_humano:
                     # Um ciclo do Atari termina após os dois agentes agirem.
                     relogio.tick(fps)
 
@@ -101,7 +77,3 @@ def jogar(modelo=None):
         pass
     finally:
         env.close()
-
-
-if __name__ == "__main__":
-    jogar(sys.argv[1] if len(sys.argv) > 1 else None)

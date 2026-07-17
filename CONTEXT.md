@@ -12,6 +12,14 @@ _Avoid_: Oponente principal, adversário de treino dinâmico.
 Um agente que atualiza seu comportamento durante sua fase de treinamento (ex: AgenteRL, AgenteGenetico).
 _Avoid_: Agente treinável, modelo.
 
+**Agent Type**:
+A técnica que define como um Learning Agent aprende e age. Os tipos treináveis são `rl` e `genetico`.
+_Avoid_: Nome do modelo, arquivo do modelo.
+
+**Best Trained Artifact**:
+O artefato padrão que preserva o Learning Agent de melhor desempenho obtido na execução de treinamento mais recente de um Agent Type. Ele não representa necessariamente o melhor resultado histórico entre execuções independentes.
+_Avoid_: Modelo padrão, último checkpoint.
+
 **Evaluation Phase**:
 O script ou processo final onde os Learning Agents já treinados competem entre si (ou contra o Baseline) para medirmos a performance e generalização de cada técnica.
 _Avoid_: Teste, Validação final.

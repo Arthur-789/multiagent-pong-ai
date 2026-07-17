@@ -1,6 +1,5 @@
 # Treina o agente de Q-learning tabular praticando devolucoes.
 
-import sys
 import random
 from collections import deque
 
@@ -248,6 +247,3 @@ def treinar(render=RENDER_TREINO):
             "\nTreinamento concluído. Último checkpoint salvo em "
             f"'{caminho_checkpoint(DIRETORIO_CHECKPOINTS, TREINO_EPISODIOS)}'."
         )
-
-if __name__ == "__main__":
-    treinar(render="--render" in sys.argv)

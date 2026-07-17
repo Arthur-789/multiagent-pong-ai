@@ -1,13 +1,14 @@
 # Compara dois agentes treinados (ou heurísticos), jogando várias partidas entre eles e reportando estatísticas finais.
 
-import sys
 import pygame
-import numpy as np
 
 from environment import criar_ambiente
-from rl_agent import AgenteRL
-from genetic_agent import AgenteGenetico
-import heuristic_agent
+from agents import (
+    LADO_DIREITO,
+    LADO_ESQUERDO,
+    PREFERENCIAS_LADO,
+    carregar_agente,
+)
 from config import (
     PARTIDAS_AVALIACAO,
     PROBABILIDADE_ACAO_REPETIDA_AVALIACAO,
@@ -18,49 +19,6 @@ from config import (
 
 IDX_PLACAR_ESQ = 13
 IDX_PLACAR_DIR = 14
-
-LADO_DIREITO = "first_0"
-LADO_ESQUERDO = "second_0"
-
-PREFERENCIAS = {
-    "rl": LADO_DIREITO,
-    "genetico": LADO_ESQUERDO,
-
-    "heuristico": None
-}
-
-class AgenteHeuristicoWrapper:
-    def __init__(self, agente_id):
-        self.agente_id = agente_id
-
-    def resetar_estado(self):
-        pass
-
-    def escolher_acao(self, observacao):
-        return heuristic_agent.escolher_acao(observacao, agente_id=self.agente_id)
-
-class AgenteRLWrapper:
-    def __init__(self, agente):
-        self.agente = agente
-
-    def resetar_estado(self):
-        self.agente.resetar_estado()
-
-    def escolher_acao(self, observacao):
-        return self.agente.escolher_acao(observacao, explorar=False)
-
-def instanciar_agente(tipo, agente_id):
-    if tipo == "rl":
-        agente = AgenteRL()
-        agente.carregar("checkpoints_tabular/melhor_qtable.npz")
-        return AgenteRLWrapper(agente)
-    elif tipo == "genetico":
-        cromossomo = np.load("melhor_cromossomo.npy")
-        return AgenteGenetico(cromossomo)
-    elif tipo == "heuristico":
-        return AgenteHeuristicoWrapper(agente_id)
-    else:
-        raise ValueError(f"Agente desconhecido: {tipo}")
 
 def jogar_partida(env, esq_agent, dir_agent, seed, relogio=None):
     env.reset(seed=seed)
@@ -94,13 +52,13 @@ def jogar_partida(env, esq_agent, dir_agent, seed, relogio=None):
     return pontos_esq, pontos_dir, partida_truncada
 
 def alocar_lados(agente1, agente2):
-    if agente1 not in PREFERENCIAS:
+    if agente1 not in PREFERENCIAS_LADO:
         raise ValueError(f"Agente desconhecido: {agente1}. Opções: rl, genetico, heuristico.")
-    if agente2 not in PREFERENCIAS:
+    if agente2 not in PREFERENCIAS_LADO:
         raise ValueError(f"Agente desconhecido: {agente2}. Opções: rl, genetico, heuristico.")
 
-    p1 = PREFERENCIAS[agente1]
-    p2 = PREFERENCIAS[agente2]
+    p1 = PREFERENCIAS_LADO[agente1]
+    p2 = PREFERENCIAS_LADO[agente2]
 
     if p1 is not None and p2 is not None and p1 == p2:
         raise ValueError(f"Não é possível colocar {agente1} contra {agente2} pois ambos requerem o lado {p1}")
@@ -110,8 +68,8 @@ def alocar_lados(agente1, agente2):
     else:
         esq_type, dir_type = agente1, agente2
         
-    return (esq_type, instanciar_agente(esq_type, LADO_ESQUERDO),
-            dir_type, instanciar_agente(dir_type, LADO_DIREITO))
+    return (esq_type, carregar_agente(esq_type, LADO_ESQUERDO),
+            dir_type, carregar_agente(dir_type, LADO_DIREITO))
 
 def avaliar(agente1_type, agente2_type, render=RENDER_AVALIACAO):
     print(f"Alocando {agente1_type} e {agente2_type}...")
@@ -184,12 +142,3 @@ def avaliar(agente1_type, agente2_type, render=RENDER_AVALIACAO):
     
     print(f"\nEmpates: {empates}")
     print(f"Truncamentos: {truncamentos}")
-
-if __name__ == "__main__":
-    args = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
-    if len(args) != 2:
-        print("Uso: python evaluate.py <agente1> <agente2> [--render]")
-        print("Opções: rl, genetico, heuristico")
-        sys.exit(1)
-        
-    avaliar(args[0], args[1], render="--render" in sys.argv)

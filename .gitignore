@@ -1,5 +1,6 @@
 venv/
 __pycache__/
 *.py[cod]
+*.npy
 checkpoints/
 checkpoints_tabular/

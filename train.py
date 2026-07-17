@@ -5,6 +5,7 @@ from collections import deque
 
 import numpy as np
 
+from agents import AgenteHeuristico, AgenteRLCarregado, LADO_ESQUERDO
 from environment import criar_ambiente
 from evaluate import jogar_partida
 from rl_agent import AgenteRL
@@ -38,14 +39,17 @@ def avaliar_para_selecao(agente_rl):
     env = criar_ambiente(
         probabilidade_acao_repetida=PROBABILIDADE_ACAO_REPETIDA_AVALIACAO
     )
+    agente_esq = AgenteHeuristico(LADO_ESQUERDO)
+    agente_dir = AgenteRLCarregado(agente_rl)
     margens = []
     pontos = []
     vitorias = 0
     try:
         for partida in range(PARTIDAS_VALIDACAO):
-            pontos_rl, pontos_oponente, truncada = jogar_partida(
+            pontos_oponente, pontos_rl, truncada = jogar_partida(
                 env,
-                agente_rl,
+                agente_esq,
+                agente_dir,
                 seed=SEED_VALIDACAO + partida,
             )
             if truncada:

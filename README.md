@@ -11,8 +11,9 @@ O objetivo não é obter o melhor agente possível, mas sim comparar:
    estado, objetivo e regras de alinhamento com a bola.
 2. **Agente de aprendizado por reforço (Q-Learning tabular)** — aprende
    a jogar por tentativa e erro, atualizando diretamente uma tabela Q.
-3. **Agente genético (Algoritmo Genético)** — utiliza evolução diferencial
-   (DEAP) para otimizar uma rede neural de uma camada a partir de um
+3. **Agente genético (Algoritmo Genético)** — utiliza um algoritmo
+   genético clássico (seleção, crossover, mutação, elitismo, via DEAP)
+   para otimizar uma rede neural de uma camada a partir de um
    cromossomo binário de 12.288 bits.
 
 ## Sobre o jogo
@@ -89,23 +90,40 @@ número. O progresso e o número de rebatidas são impressos no terminal a cada
 python train_genetic.py
 ```
 
+Os hiperparâmetros do algoritmo evolutivo (população, gerações, taxas de
+crossover/mutação, rallies por avaliação e caminho do checkpoint) ficam
+centralizados em **`config.py`**, junto com os demais parâmetros do projeto.
+Também é possível sobrescrever qualquer um desses valores pontualmente via
+linha de comando, sem editar `config.py`:
+
+```bash
+python train_genetic.py --pop-size 50 --n-gen 50 --cxpb 0.6 --mutpb 0.3 \
+    --checkpoint-path melhor_cromossomo.npy
+```
+
 O treinamento do agente genético é feito separadamente, pois utiliza o framework
 DEAP ao invés do loop de treinamento do Q-Learning. O algoritmo genético otimiza
 um cromossomo binário de 12.288 bits que codifica uma rede neural de uma camada.
-Cada geração, cada indivíduo da população é avaliado contra o agente heurístico,
-recebendo as mesmas recompensas do agente de RL. O fitness é deslocado em +1000
-para que a seleção por roleta funcione mesmo com valores negativos.
+Cada indivíduo da população é avaliado contra o agente heurístico em vários rallies
+com seeds diferentes, recebendo as mesmas recompensas do agente de RL, e o fitness
+final é a média entre esses rallies. Usar várias seeds evita que o ambiente
+reproduza sempre o mesmo cenário inicial, o que tornaria os indivíduos
+indistinguíveis entre si. O fitness é deslocado em +1000 para que a seleção
+funcione mesmo com valores negativos.
 
 O treinamento usa os seguintes parâmetros do algoritmo evolutivo:
 
-- **População**: 20 indivíduos (padrão)
-- **Gerações**: 10 (padrão)
-- **Crossover**: dois pontos (taxa de 50%)
-- **Mutação**: flip bit com probabilidade de 1% por bit (taxa de 20% por indivíduo)
-- **Seleção**: roleta
-- **Elitismo**: HallOfFame preserva o melhor indivíduo
+- **População**: 50 indivíduos (padrão)
+- **Gerações**: 30 (padrão)
+- **Avaliação**: 5 rallies por indivíduo (média), cada um com uma seed diferente
+- **Crossover**: dois pontos (taxa de 60% por padrão)
+- **Mutação**: flip bit com probabilidade de ~1/12288 por bit (~1 bit esperado por indivíduo mutado), taxa de 30% por indivíduo (padrão)
+- **Seleção**: torneio (tamanho 3)
+- **Elitismo**: o melhor indivíduo (HallOfFame) é preservado e reinserido na população caso toda a geração seguinte regrida
 
-Ao final, o melhor cromossomo é salvo em `melhor_cromossomo.npy`.
+A cada geração, o melhor cromossomo encontrado até então é salvo em
+`melhor_cromossomo.npy` (`GA_CAMINHO_CHECKPOINT`, ou no caminho definido em
+`--checkpoint-path`), permitindo interromper o treino sem perder o progresso.
 
 ## Como avaliar
 
@@ -183,7 +201,8 @@ os dois agentes tendo recompensa negativa.
 
 Todos os parâmetros ajustáveis (número de episódios de treino,
 número de partidas de avaliação, taxa de aprendizado, epsilon,
-etc.) estão centralizados em **`config.py`**.
+população e gerações do algoritmo genético, etc.) estão centralizados
+em **`config.py`**.
 
 ## Estrutura dos arquivos
 
@@ -251,7 +270,8 @@ do jogo (`NOOP`, `FIRE`, `RIGHT`, `LEFT`, `FIRE_RIGHT`, `FIRE_LEFT`), sendo
 escolhida a de maior pontuação.
 
 O algoritmo genético é executado pelo script `train_genetic.py`, que usa a
-biblioteca DEAP com seleção por roleta, crossover de dois pontos e mutação por
-flip bit. A avaliação de cada indivíduo é feita em um único rally contra o
-agente heurístico, com o mesmo sistema de reward shaping utilizado no treino
-do agente de RL. O melhor cromossomo encontrado é salvo em `melhor_cromossomo.npy`.
+biblioteca DEAP com seleção por torneio, crossover de dois pontos e mutação por
+flip bit. A avaliação de cada indivíduo é a média de vários rallies (com seeds
+diferentes) contra o agente heurístico, com o mesmo sistema de reward shaping
+utilizado no treino do agente de RL. O melhor cromossomo encontrado é salvo em
+`melhor_cromossomo.npy` a cada geração.

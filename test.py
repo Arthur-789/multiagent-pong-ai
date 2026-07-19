@@ -356,7 +356,7 @@ class TrainTest(unittest.TestCase):
     @patch("train.PARTIDAS_VALIDACAO", 3)
     @patch("train.criar_ambiente")
     def test_avalia_rl_contra_baseline_sem_exploracao(self, criar_env):
-        from train import avaliar_para_selecao
+        from train_rl import avaliar_para_selecao
 
         env = AmbienteValidacaoFalso(
             [

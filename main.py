@@ -4,7 +4,7 @@ import argparse
 
 
 def treinar_rl():
-    from train import treinar
+    from train_rl import treinar
 
     treinar()
 

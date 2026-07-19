@@ -1,5 +1,3 @@
-# Agente baseado em estado, objetivo e busca heurística.
-
 # Estratégia (busca gulosa / greedy search):
 #  1. Ler a posição Y da própria raquete e da bola na RAM.
 #  2. Definir o objetivo: alinhar a raquete com a altura da bola.

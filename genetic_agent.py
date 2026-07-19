@@ -5,10 +5,8 @@ IDX_BOLA_Y = 54
 FIRE = 1
 
 def decodificar_cromossomo(cromossomo):
-    """
-    Decodifica um cromossomo de 12288 bits em uma matriz de pesos (128, 6).
-    Cada peso usa 16 bits (ponto fixo).
-    """
+    # Decodifica um cromossomo de 12288 bits em uma matriz de pesos (128, 6).
+    # Cada peso usa 16 bits (ponto fixo).
     cromossomo_array = np.array(cromossomo, dtype=np.uint8)
     
     # Redimensiona para (768, 16)
@@ -35,14 +33,7 @@ class AgenteGenetico:
         return bola_x == 0 or bola_y == 0
 
     def escolher_acao(self, observacao_ram):
-        """
-        Recebe a observacao de RAM (128 bytes), divide por 255.0 (conforme issue #7),
-        multiplica pela matriz de pesos e retorna a ação de maior pontuação.
-        """
-        # [Decisão de Design]: Como o Agente Genético foi treinado apenas em single-rallies 
-        # (encerrando a partida logo após o 1º ponto), ele não aprendeu a sacar.
-        # Bypassamos o Agente injetando um FIRE estático aqui para evitar ter que 
-        # retreinar todo o cromossomo em partidas de múltiplos pontos.
+        # Recebe a observacao de RAM (128 bytes), divide por 255.0 (conforme issue #7), multiplica pela matriz de pesos e retorna a ação de maior pontuação.
         if self._esta_aguardando_saque(observacao_ram):
             return FIRE  # saque
 

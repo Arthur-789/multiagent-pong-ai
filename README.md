@@ -184,8 +184,7 @@ em **`config.py`**.
 | `config.py`          | Configurações do projeto       |
 | `environment.py`     | Criação do ambiente PettingZoo Pong (modo RAM)                |
 | `heuristic_agent.py` | Agente de busca heurística baseado em posições da RAM           |
-| `training_opponent.py` | Implementação alternativa de oponente com antecipação           |
-| `rl_agent.py`        | Agente de RL: estado discreto, tabela Q e Q-Learning            |
+| `rl_agent.py`        | Agente de RL: estado discreto, tabela Q, Q-Learning e checkpoints tabulares |
 | `genetic_agent.py`   | Agente genético: decodificação de cromossomo e seleção de ação   |
 | `agents.py`          | Tipos de agente, artefatos padrão e preferências de lado          |
 | `train.py`           | Loop de treinamento do agente de RL                              |
@@ -193,7 +192,6 @@ em **`config.py`**.
 | `evaluate.py`        | Compara dois agentes e imprime as estatísticas finais            |
 | `melhor_cromossomo.npy` | Melhor cromossomo encontrado pelo algoritmo genético          |
 | `jogar.py`           | Permite jogar contra qualquer tipo de agente                     |
-| `checkpoints.py`     | Nomeação e seleção dos checkpoints tabulares                     |
 | `main.py`            | Única interface de linha de comando do projeto                   |
 | `requirements.txt`   | Dependências do projeto                                          |
 

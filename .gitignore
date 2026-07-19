@@ -1,6 +1,11 @@
 venv/
 __pycache__/
-*.py[cod]
-*.npy
 checkpoints/
 checkpoints_tabular/
+git_log.txt
+.ai-jail
+diff.patch
+skills-lock.json
+*.py[cod]
+*.npy
+*.pt

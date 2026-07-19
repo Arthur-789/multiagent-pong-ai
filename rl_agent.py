@@ -1,13 +1,35 @@
-"""Agente de Q-learning tabular com estado derivado exclusivamente da RAM."""
-
 import os
 import random
+import re
 import tempfile
 from pathlib import Path
 
 import numpy as np
 
 from config import FATOR_DESCONTO, TAXA_APRENDIZADO, TAXA_APRENDIZADO_FINAL
+
+PADRAO_CHECKPOINT = re.compile(r"^qtable_episodio_(\d+)\.npz$")
+
+
+def caminho_checkpoint(diretorio, episodio):
+    # Monta o caminho padronizado de um checkpoint tabular por episódio.
+    return Path(diretorio) / f"qtable_episodio_{episodio:06d}.npz"
+
+
+def checkpoint_mais_recente(diretorio):
+    # Retorna o checkpoint de maior número de episódio em `diretorio`, ou None.
+    diretorio = Path(diretorio)
+    if not diretorio.is_dir():
+        return None
+
+    encontrados = []
+    for caminho in diretorio.iterdir():
+        correspondencia = PADRAO_CHECKPOINT.fullmatch(caminho.name)
+        if correspondencia and caminho.is_file():
+            encontrados.append((int(correspondencia.group(1)), caminho))
+
+    return max(encontrados, default=(None, None), key=lambda item: item[0])[1]
+
 
 IDX_BOLA_X = 49
 IDX_JOGADOR_Y = 51

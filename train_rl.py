@@ -8,9 +8,8 @@ import numpy as np
 from agents import AgenteHeuristico, AgenteRLCarregado, LADO_ESQUERDO
 from environment import criar_ambiente
 from evaluate import jogar_partida
-from rl_agent import AgenteRL
+from rl_agent import AgenteRL, caminho_checkpoint, checkpoint_mais_recente
 import heuristic_agent
-from checkpoints import caminho_checkpoint, checkpoint_mais_recente
 from config import (
     TREINO_EPISODIOS,
     EPSILON_INICIAL,

@@ -107,7 +107,7 @@ funcione mesmo com valores negativos.
 O treinamento usa os seguintes parâmetros do algoritmo evolutivo:
 
 - **População**: 50 indivíduos (padrão)
-- **Gerações**: 30 (padrão)
+- **Gerações**: 200 (padrão)
 - **Avaliação**: 5 rallies por indivíduo (média), cada um com uma seed diferente
 - **Crossover**: dois pontos (taxa de 60% por padrão)
 - **Mutação**: flip bit com probabilidade de ~1/12288 por bit (~1 bit esperado por indivíduo mutado), taxa de 30% por indivíduo (padrão)

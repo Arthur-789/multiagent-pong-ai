@@ -390,6 +390,39 @@ class TrainTest(unittest.TestCase):
 # train_genetic.py
 # =====================================================================
 class AvaliarRallyTest(unittest.TestCase):
+    def _observacao(self, bola_x, bola_y=100, jogador_y=100):
+        observacao = np.zeros(128, dtype=np.uint8)
+        observacao[49] = bola_x
+        observacao[50] = jogador_y
+        observacao[54] = bola_y
+        return observacao
+
+    def _ambiente_com_observacoes_genetico(self, observacoes):
+        class AmbienteSequencial:
+            def __init__(self, observacoes):
+                self.turnos = [
+                    (nome, observacao)
+                    for observacao in observacoes
+                    for nome in ("second_0", "first_0")
+                ]
+                self.turno_atual = None
+
+            def reset(self, seed=None):
+                pass
+
+            def agent_iter(self):
+                for turno in self.turnos:
+                    self.turno_atual = turno
+                    yield turno[0]
+
+            def last(self):
+                return self.turno_atual[1], 0, False, False, {}
+
+            def step(self, acao):
+                pass
+
+        return AmbienteSequencial(observacoes)
+
     def test_reset_recebe_seed_explicita(self):
         import train_genetic
 
@@ -414,6 +447,46 @@ class AvaliarRallyTest(unittest.TestCase):
         train_genetic.avaliar_rally(agente, None, "heuristico", env, seed=2)
 
         env.reset.assert_has_calls([call(seed=1), call(seed=2)])
+
+    def test_fitness_nao_premia_reversao_no_lado_direito(self):
+        import train_genetic
+
+        env = self._ambiente_com_observacoes_genetico(
+            [
+                self._observacao(0, 0),
+                self._observacao(100),
+                self._observacao(101),
+                self._observacao(100),
+            ]
+        )
+        agente = Mock()
+        agente.escolher_acao.return_value = 1
+
+        fitness = train_genetic.avaliar_rally(
+            agente, None, "heuristico", env, seed=123
+        )
+
+        self.assertEqual(fitness, 0.0)
+
+    def test_fitness_premia_reversao_no_lado_esquerdo(self):
+        import train_genetic
+
+        env = self._ambiente_com_observacoes_genetico(
+            [
+                self._observacao(0, 0),
+                self._observacao(100),
+                self._observacao(99),
+                self._observacao(100),
+            ]
+        )
+        agente = Mock()
+        agente.escolher_acao.return_value = 1
+
+        fitness = train_genetic.avaliar_rally(
+            agente, None, "heuristico", env, seed=123
+        )
+
+        self.assertEqual(fitness, 5.0)
 
 
 class EvalAgenteTest(unittest.TestCase):

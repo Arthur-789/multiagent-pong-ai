@@ -49,9 +49,9 @@ def avaliar_rally(agente, oponente, oponente_tipo, env, seed=None):
                 bola_x_anterior = bola_x
             else:
                 direcao_x = bola_x - bola_x_anterior
-                # O Genético (second_0) fica no lado esquerdo da tela, então a bola aproxima dele quando direcao_x > 0
-                # Ele rebate se a bola estava se aproximando (>0) e passa a se afastar (<0)
-                rebateu = direcao_x_anterior > 0 and direcao_x < 0
+                # O Genético (second_0) fica no lado esquerdo da tela, então a bola
+                # se aproxima dele quando direcao_x < 0 e se afasta após o rebote.
+                rebateu = direcao_x_anterior < 0 and direcao_x > 0
                 if direcao_x != 0:
                     direcao_x_anterior = direcao_x
                 bola_x_anterior = bola_x
@@ -63,8 +63,8 @@ def avaliar_rally(agente, oponente, oponente_tipo, env, seed=None):
             elif rebateu:
                 recompensa_shape = RECOMPENSA_REBATIDA
 
-            # Distância de aproximação quando a bola vem na direção da raquete (direcao_x > 0)
-            if direcao_x_anterior > 0:
+            # Distância de aproximação quando a bola vem na direção da raquete (direcao_x < 0)
+            if direcao_x_anterior < 0:
                 distancia = abs(bola_y - jogador_y)
                 if distancia_anterior is not None:
                     progresso = distancia_anterior - distancia

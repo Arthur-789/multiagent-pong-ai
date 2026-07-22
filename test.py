@@ -435,7 +435,7 @@ class EvalAgenteTest(unittest.TestCase):
         self.assertEqual(seeds_usadas, [100, 101, 102])
 
         media_esperada = (10.0 - 25.0 + 5.0) / 3
-        self.assertAlmostEqual(resultado[0], media_esperada + 1000.0)
+        self.assertAlmostEqual(resultado[0], media_esperada)
         env.close.assert_called_once_with()
 
     @patch("train_genetic.avaliar_rally")
@@ -461,12 +461,23 @@ class ToolboxConfigTest(unittest.TestCase):
         self.assertIsNotNone(indpb)
         self.assertLess(indpb, 0.001)
 
-    def test_selecao_nao_e_mais_roleta(self):
+    def test_selecao_e_roleta_com_fitness_negativo(self):
         import train_genetic
 
         select_func = train_genetic.toolbox.select
         nome = getattr(select_func, "func", select_func).__name__
-        self.assertNotEqual(nome, "selRoulette")
+        self.assertEqual(nome, "sel_roleta")
+
+        populacao = []
+        for fitness in (-25.0, 0.0, 25.0):
+            individuo = train_genetic.creator.Individual([0] * 12288)
+            individuo.fitness.values = (fitness,)
+            populacao.append(individuo)
+
+        with patch("train_genetic.random.random", return_value=0.99):
+            selecionado = select_func(populacao, 1)[0]
+
+        self.assertIs(selecionado, populacao[2])
 
 
 if __name__ == "__main__":

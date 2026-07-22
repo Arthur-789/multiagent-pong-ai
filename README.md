@@ -101,8 +101,10 @@ Cada indivíduo da população é avaliado contra o agente heurístico em vário
 com seeds diferentes, recebendo as mesmas recompensas do agente de RL, e o fitness
 final é a média entre esses rallies. Usar várias seeds evita que o ambiente
 reproduza sempre o mesmo cenário inicial, o que tornaria os indivíduos
-indistinguíveis entre si. O fitness é deslocado em +1000 para que a seleção
-funcione mesmo com valores negativos.
+indistinguíveis entre si. Como o fitness pode ser negativo, a roleta calcula
+pesos positivos apenas durante a seleção: subtrai o menor fitness da população
+e soma um epsilon mínimo (`1e-6`). O fitness armazenado e exibido continua
+sendo o valor real.
 
 O treinamento usa os seguintes parâmetros do algoritmo evolutivo:
 
@@ -111,7 +113,8 @@ O treinamento usa os seguintes parâmetros do algoritmo evolutivo:
 - **Avaliação**: 5 rallies por indivíduo (média), cada um com uma seed diferente
 - **Crossover**: dois pontos (taxa de 60% por padrão)
 - **Mutação**: flip bit com probabilidade de ~1/12288 por bit (~1 bit esperado por indivíduo mutado), taxa de 30% por indivíduo (padrão)
-- **Seleção**: torneio (tamanho 3)
+- **Seleção**: roleta, com pesos obtidos pelo deslocamento do menor fitness da
+  população e epsilon `1e-6`
 - **Elitismo**: o melhor indivíduo (HallOfFame) é preservado e reinserido na população caso toda a geração seguinte regrida
 
 A cada geração, o melhor cromossomo encontrado até então é salvo em
@@ -241,7 +244,7 @@ do jogo (`NOOP`, `FIRE`, `RIGHT`, `LEFT`, `FIRE_RIGHT`, `FIRE_LEFT`), sendo
 escolhida a de maior pontuação.
 
 O algoritmo genético é executado pelo script `train_genetic.py`, que usa a
-biblioteca DEAP com seleção por torneio, crossover de dois pontos e mutação por
+biblioteca DEAP com seleção por roleta, crossover de dois pontos e mutação por
 flip bit. A avaliação de cada indivíduo é a média de vários rallies (com seeds
 diferentes) contra o agente heurístico, com o mesmo sistema de reward shaping
 utilizado no treino do agente de RL. O melhor cromossomo encontrado é salvo em

@@ -24,6 +24,14 @@ _Avoid_: Modelo padrão, último checkpoint.
 O script ou processo final onde os Learning Agents já treinados competem entre si (ou contra o Baseline) para medirmos a performance e generalização de cada técnica.
 _Avoid_: Teste, Validação final.
 
+**Fitness**:
+A pontuação real que mede o desempenho de um indivíduo do AgenteGenetico durante a avaliação em rallies.
+_Avoid_: Peso da roleta, pontuação deslocada.
+
+**Peso de Seleção**:
+O valor positivo derivado do Fitness somente para calcular a probabilidade de seleção na roleta.
+_Avoid_: Fitness ajustado, fitness +1000.
+
 **Sides (Lados da Tela)**:
 No ambiente PettingZoo Pong, o mapeamento real na memória RAM (51 para direita, 50 para esquerda) determina que `first_0` representa o **Lado Direito** e `second_0` representa o **Lado Esquerdo**. 
 _Avoid_: Chamar `first_0` de esquerdo, inverter a ordem dos lados em variáveis e scripts.

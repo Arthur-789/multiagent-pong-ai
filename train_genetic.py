@@ -1,4 +1,5 @@
 import random
+import bisect
 import numpy as np
 from deap import base, creator, tools
 
@@ -113,9 +114,9 @@ def eval_agente(individuo, n_rallies=GA_RALLIES_POR_AVALIACAO, seed_base=SEED):
 
     fitness_medio = fitness_total / n_rallies
 
-    # Ajustar para garantir que seja > 0 (Shift constante de segurança).
-    # Necessário pois a seleção por roleta lida mal com fitness negativo.
-    return (fitness_medio + 1000.0,)
+    # O fitness permanece real; a seleção transforma esses valores em pesos
+    # positivos apenas no momento de montar a roleta.
+    return (fitness_medio,)
 
 creator.create("FitnessMax", base.Fitness, weights=(1.0,))
 creator.create("Individual", list, fitness=creator.FitnessMax)
@@ -131,9 +132,28 @@ toolbox.register("mate", tools.cxTwoPoint)
 # flipar o bit mais significativo de um peso muda seu valor quase de -1.0 para +1.0 de uma vez).
 # 1/12288 mantem em media ~1 bit alterado por individuo mutado, uma perturbacao muito mais suave.
 toolbox.register("mutate", tools.mutFlipBit, indpb=1.0 / 12288)
-# Selecao por torneio mantem pressao seletiva mesmo quando o fitness fica quase plano (ex.: varios individuos empatados em 1000).
-# A Roleta praticamente vira selecao uniforme quando a variancia do fitness e pequena, perdendo elitismo.
-toolbox.register("select", tools.selTournament, tournsize=3)
+def sel_roleta(populacao, k, epsilon=1e-6):
+    """Seleciona ``k`` indivíduos com reposição pela roleta."""
+    if not populacao:
+        return []
+
+    menor_fitness = min(ind.fitness.values[0] for ind in populacao)
+    pesos = [
+        ind.fitness.values[0] - menor_fitness + epsilon
+        for ind in populacao
+    ]
+    acumulados = list(np.cumsum(pesos))
+    total = acumulados[-1]
+
+    selecionados = []
+    for _ in range(k):
+        alvo = random.random() * total
+        indice = bisect.bisect_left(acumulados, alvo)
+        selecionados.append(populacao[min(indice, len(populacao) - 1)])
+    return selecionados
+
+
+toolbox.register("select", sel_roleta)
 
 def treinar(pop_size=GA_POP_SIZE, n_gen=GA_N_GEN, cxpb=GA_CXPB, mutpb=GA_MUTPB,
             checkpoint_path=GA_CAMINHO_CHECKPOINT):
@@ -144,11 +164,11 @@ def treinar(pop_size=GA_POP_SIZE, n_gen=GA_N_GEN, cxpb=GA_CXPB, mutpb=GA_MUTPB,
     hof = tools.HallOfFame(1)  # Elitismo (HallOfFame)
 
     stats = tools.Statistics(lambda ind: ind.fitness.values)
-    # Reporta o fitness "real" (subtraindo o offset de +1000 usado so para manter os valores positivos durante a selecao), facilitando leitura do log.
-    stats.register("avg", lambda vals: np.mean(vals) - 1000.0)
+    # Reporta o fitness real; a transformação positiva existe apenas na roleta.
+    stats.register("avg", np.mean)
     stats.register("std", np.std)
-    stats.register("min", lambda vals: np.min(vals) - 1000.0)
-    stats.register("max", lambda vals: np.max(vals) - 1000.0)
+    stats.register("min", np.min)
+    stats.register("max", np.max)
 
     print("Iniciando Treinamento do Agente Genético...")
     print(f"pop_size={pop_size} n_gen={n_gen} cxpb={cxpb} mutpb={mutpb} "
@@ -206,8 +226,8 @@ def treinar(pop_size=GA_POP_SIZE, n_gen=GA_N_GEN, cxpb=GA_CXPB, mutpb=GA_MUTPB,
         _salvar_checkpoint(hof[0], checkpoint_path)
 
     melhor_ind = hof[0]
-    print("\nTreinamento finalizado. Melhor fitness absoluto (sem offset):",
-          melhor_ind.fitness.values[0] - 1000.0)
+    print("\nTreinamento finalizado. Melhor fitness:",
+          melhor_ind.fitness.values[0])
     print(f"Cromossomo salvo em '{checkpoint_path}'.")
 
 

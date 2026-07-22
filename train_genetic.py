@@ -90,8 +90,10 @@ def avaliar_rally(agente, oponente, oponente_tipo, env, seed=None):
 
         env.step(acao)
 
-        # Fim do rally
-        if recompensa != 0:
+        # O resultado do ponto chega primeiro ao agente que marcou. Mantemos o
+        # loop até o Genético processar a recompensa correspondente, inclusive
+        # a punição por ponto sofrido.
+        if nome_agente == "second_0" and recompensa != 0:
             break
             
     return fitness_total

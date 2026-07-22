@@ -121,6 +121,14 @@ A cada geração, o melhor cromossomo encontrado até então é salvo em
 `melhor_cromossomo.npy` (`GA_CAMINHO_CHECKPOINT`), permitindo interromper o
 treino sem perder o progresso.
 
+O log do treinamento usa nomes explícitos. `fitness_medio` é a média da
+população, `variacao_fitness` é o desvio padrão, `pior_fitness` é o menor
+fitness da população, e `individuos_avaliados` indica quantos indivíduos
+precisaram jogar novamente naquela geração. `melhor_fitness_geracao` é o melhor
+resultado produzido pela geração antes do elitismo; `melhor_fitness_historico`
+é o melhor resultado encontrado desde o início. Se o primeiro ficar abaixo do
+segundo, a geração regrediu, mas o melhor indivíduo histórico foi preservado.
+
 ## Como avaliar
 
 ```bash

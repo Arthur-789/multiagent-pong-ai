@@ -165,14 +165,17 @@ def treinar(pop_size=GA_POP_SIZE, n_gen=GA_N_GEN, cxpb=GA_CXPB, mutpb=GA_MUTPB,
 
     stats = tools.Statistics(lambda ind: ind.fitness.values)
     # Reporta o fitness real; a transformação positiva existe apenas na roleta.
-    stats.register("avg", np.mean)
-    stats.register("std", np.std)
-    stats.register("min", np.min)
-    stats.register("max", np.max)
+    stats.register("fitness_medio", np.mean)
+    stats.register("variacao_fitness", np.std)
+    stats.register("pior_fitness", np.min)
 
     print("Iniciando Treinamento do Agente Genético...")
-    print(f"pop_size={pop_size} n_gen={n_gen} cxpb={cxpb} mutpb={mutpb} "
-          f"rallies_por_avaliacao={GA_RALLIES_POR_AVALIACAO}\n")
+    print("Parâmetros do treinamento:")
+    print(f"  tamanho_populacao={pop_size}")
+    print(f"  numero_geracoes={n_gen}")
+    print(f"  taxa_crossover={cxpb}")
+    print(f"  taxa_mutacao={mutpb}")
+    print(f"  rallies_por_individuo={GA_RALLIES_POR_AVALIACAO}\n")
 
     # Avalia a populacao inicial (geracao 0) manualmente para poder salvar checkpoint e permitir acompanhar evolucao desde o inicio.
     fitnesses = list(map(toolbox.evaluate, pop))
@@ -181,9 +184,24 @@ def treinar(pop_size=GA_POP_SIZE, n_gen=GA_N_GEN, cxpb=GA_CXPB, mutpb=GA_MUTPB,
     hof.update(pop)
 
     logbook = tools.Logbook()
-    logbook.header = ["gen", "nevals"] + stats.fields
+    logbook.header = [
+        "geracao",
+        "individuos_avaliados",
+        "fitness_medio",
+        "variacao_fitness",
+        "pior_fitness",
+        "melhor_fitness_geracao",
+        "melhor_fitness_historico",
+    ]
+    melhor_fitness_geracao = max(ind.fitness.values[0] for ind in pop)
     record = stats.compile(pop)
-    logbook.record(gen=0, nevals=len(pop), **record)
+    logbook.record(
+        geracao=0,
+        individuos_avaliados=len(pop),
+        melhor_fitness_geracao=melhor_fitness_geracao,
+        melhor_fitness_historico=hof[0].fitness.values[0],
+        **record,
+    )
     print(logbook.stream)
     _salvar_checkpoint(hof[0], checkpoint_path)
 
@@ -211,6 +229,9 @@ def treinar(pop_size=GA_POP_SIZE, n_gen=GA_N_GEN, cxpb=GA_CXPB, mutpb=GA_MUTPB,
         for ind, fit in zip(invalidos, fitnesses):
             ind.fitness.values = fit
 
+        # Captura o melhor resultado produzido nesta geração antes do elitismo.
+        melhor_fitness_geracao = max(ind.fitness.values[0] for ind in descendentes)
+
         # Elitismo explícito: garante que o melhor indivíduo já visto sobreviva mesmo se toda a nova geração regredir.
         melhor_anterior = toolbox.clone(hof[0]) if len(hof) > 0 else None
         pop[:] = descendentes
@@ -220,7 +241,13 @@ def treinar(pop_size=GA_POP_SIZE, n_gen=GA_N_GEN, cxpb=GA_CXPB, mutpb=GA_MUTPB,
             pop[pior_idx] = melhor_anterior
 
         record = stats.compile(pop)
-        logbook.record(gen=gen, nevals=len(invalidos), **record)
+        logbook.record(
+            geracao=gen,
+            individuos_avaliados=len(invalidos),
+            melhor_fitness_geracao=melhor_fitness_geracao,
+            melhor_fitness_historico=hof[0].fitness.values[0],
+            **record,
+        )
         print(logbook.stream)
 
         _salvar_checkpoint(hof[0], checkpoint_path)

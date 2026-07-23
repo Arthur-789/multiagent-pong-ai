@@ -3,19 +3,14 @@ import numpy as np
 IDX_BOLA_X = 49
 IDX_BOLA_Y = 54
 FIRE = 1
-ACOES_VALIDAS = (1, 4, 5)
-NUM_ENTRADAS = 128
-BITS_POR_PESO = 16
-NUM_PESOS = NUM_ENTRADAS * len(ACOES_VALIDAS)
-TAMANHO_CROMOSSOMO = NUM_PESOS * BITS_POR_PESO
 
 def decodificar_cromossomo(cromossomo):
-    # Decodifica um cromossomo de 6144 bits em uma matriz de pesos (128, 3).
+    # Decodifica um cromossomo de 12288 bits em uma matriz de pesos (128, 6).
     # Cada peso usa 16 bits (ponto fixo).
     cromossomo_array = np.array(cromossomo, dtype=np.uint8)
     
-    # Redimensiona para (384, 16)
-    bits_por_peso = cromossomo_array.reshape(NUM_PESOS, BITS_POR_PESO)
+    # Redimensiona para (768, 16)
+    bits_por_peso = cromossomo_array.reshape(768, 16)
     
     # Potências de 2: [2^15, 2^14, ..., 2^0]
     potencias = 1 << np.arange(15, -1, -1)
@@ -26,7 +21,7 @@ def decodificar_cromossomo(cromossomo):
     # Mapeia de [0, 65535] para [-1.0, 1.0)
     pesos_float = (valores_int - 32768) / 32768.0
     
-    return pesos_float.reshape(NUM_ENTRADAS, len(ACOES_VALIDAS))
+    return pesos_float.reshape(128, 6)
 
 class AgenteGenetico:
     def __init__(self, cromossomo):
@@ -38,19 +33,18 @@ class AgenteGenetico:
         return bola_x == 0 or bola_y == 0
 
     def escolher_acao(self, observacao_ram):
-        # Recebe a observacao de RAM (128 bytes), divide por 255.0, multiplica
-        # pela matriz de pesos e converte o maior score para uma ação válida.
+        # Recebe a observacao de RAM (128 bytes), divide por 255.0 (conforme issue #7), multiplica pela matriz de pesos e retorna a ação de maior pontuação.
         if self._esta_aguardando_saque(observacao_ram):
             return FIRE  # saque
 
         # A observação pode vir como numpy array ou lista de int/uint8
         obs_float = np.array(observacao_ram, dtype=np.float32) / 255.0
         
-        # Produto escalar (1, 128) x (128, 3) = (1, 3)
+        # Produto escalar (1, 128) x (128, 6) = (1, 6)
         scores = np.dot(obs_float, self.pesos)
-
-        indice_acao = int(np.argmax(scores))
-        return ACOES_VALIDAS[indice_acao]
+        
+        return int(np.argmax(scores))
 
     def resetar_estado(self):
         pass
+

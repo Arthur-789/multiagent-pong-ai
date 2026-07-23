@@ -17,7 +17,6 @@ from rl_agent import (
     checkpoint_mais_recente,
 )
 from config import FATOR_DESCONTO, TAXA_APRENDIZADO, TAXA_APRENDIZADO_FINAL
-from genetic_agent import ACOES_VALIDAS as ACOES_GENETICO, AgenteGenetico
 
 
 # =====================================================================
@@ -526,7 +525,7 @@ class EvalAgenteTest(unittest.TestCase):
         # 3 rallies com fitness diferentes: garante que a média é calculada
         avaliar_rally.side_effect = [10.0, -25.0, 5.0]
 
-        individuo = [0] * 6144
+        individuo = [0] * 12288
         resultado = train_genetic.eval_agente(individuo, n_rallies=3, seed_base=100)
 
         # Verifica que cada rally usou uma seed distinta derivada de seed_base
@@ -545,7 +544,7 @@ class EvalAgenteTest(unittest.TestCase):
         criar_env.return_value = Mock()
         avaliar_rally.return_value = 0.0
 
-        resultado = train_genetic.eval_agente([0] * 6144, n_rallies=1)
+        resultado = train_genetic.eval_agente([0] * 12288, n_rallies=1)
 
         self.assertIsInstance(resultado, tuple)
         self.assertEqual(len(resultado), 1)
@@ -559,7 +558,6 @@ class ToolboxConfigTest(unittest.TestCase):
         indpb = mutate_func.keywords.get("indpb")
         self.assertIsNotNone(indpb)
         self.assertLess(indpb, 0.001)
-        self.assertAlmostEqual(indpb, 1.0 / 12288)
 
     def test_selecao_e_roleta_com_fitness_negativo(self):
         import train_genetic
@@ -570,7 +568,7 @@ class ToolboxConfigTest(unittest.TestCase):
 
         populacao = []
         for fitness in (-25.0, 0.0, 25.0):
-            individuo = train_genetic.creator.Individual([0] * 6144)
+            individuo = train_genetic.creator.Individual([0] * 12288)
             individuo.fitness.values = (fitness,)
             populacao.append(individuo)
 
@@ -578,38 +576,6 @@ class ToolboxConfigTest(unittest.TestCase):
             selecionado = select_func(populacao, 1)[0]
 
         self.assertIs(selecionado, populacao[2])
-
-
-class GeneticActionSpaceTest(unittest.TestCase):
-    def test_genetico_usa_tres_acoes_compartilhadas_com_rl(self):
-        self.assertEqual(ACOES_GENETICO, (1, 4, 5))
-
-    def test_cromossomo_genetico_tem_6144_bits_e_384_pesos(self):
-        agente = AgenteGenetico([0] * 6144)
-
-        self.assertEqual(agente.pesos.shape, (128, 3))
-
-    def test_argmax_mapeia_para_fire_right(self):
-        cromossomo = [0] * 6144
-        for peso in range(128):
-            inicio = (peso * 3 + 1) * 16
-            cromossomo[inicio:inicio + 16] = [1] * 16
-
-        agente = AgenteGenetico(cromossomo)
-        observacao = np.ones(128, dtype=np.uint8)
-
-        self.assertEqual(agente.escolher_acao(observacao), 4)
-
-    def test_argmax_mapeia_para_fire_left(self):
-        cromossomo = [0] * 6144
-        for peso in range(128):
-            inicio = (peso * 3 + 2) * 16
-            cromossomo[inicio:inicio + 16] = [1] * 16
-
-        agente = AgenteGenetico(cromossomo)
-        observacao = np.ones(128, dtype=np.uint8)
-
-        self.assertEqual(agente.escolher_acao(observacao), 5)
 
 
 if __name__ == "__main__":

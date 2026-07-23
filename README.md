@@ -14,7 +14,7 @@ O objetivo não é obter o melhor agente possível, mas sim comparar:
 3. **Agente genético (Algoritmo Genético)** — utiliza um algoritmo
    genético clássico (seleção, crossover, mutação, elitismo, via DEAP)
    para otimizar uma rede neural de uma camada a partir de um
-   cromossomo binário de 12.288 bits.
+   cromossomo binário de 6.144 bits.
 
 ## Sobre o jogo
 
@@ -96,7 +96,7 @@ centralizados em **`config.py`**, junto com os demais parâmetros do projeto.
 
 O treinamento do agente genético é feito separadamente, pois utiliza o framework
 DEAP ao invés do loop de treinamento do Q-Learning. O algoritmo genético otimiza
-um cromossomo binário de 12.288 bits que codifica uma rede neural de uma camada.
+um cromossomo binário de 6.144 bits que codifica uma rede neural de uma camada.
 Cada indivíduo da população é avaliado contra o agente heurístico em vários rallies
 com seeds diferentes, recebendo as mesmas recompensas do agente de RL, e o fitness
 final é a média entre esses rallies. Usar várias seeds evita que o ambiente
@@ -112,7 +112,7 @@ O treinamento usa os seguintes parâmetros do algoritmo evolutivo:
 - **Gerações**: 200 (padrão)
 - **Avaliação**: 5 rallies por indivíduo (média), cada um com uma seed diferente
 - **Crossover**: dois pontos (taxa de 60% por padrão)
-- **Mutação**: flip bit com probabilidade de ~1/12288 por bit (~1 bit esperado por indivíduo mutado), taxa de 30% por indivíduo (padrão)
+- **Mutação**: flip bit com probabilidade de ~1/12288 por bit (~0,5 bit esperado por indivíduo mutado), taxa de 30% por indivíduo (padrão)
 - **Seleção**: roleta, com pesos obtidos pelo deslocamento do menor fitness da
   população e epsilon `1e-6`
 - **Elitismo**: o melhor indivíduo (HallOfFame) é preservado e reinserido na população caso toda a geração seguinte regrida
@@ -243,13 +243,14 @@ mais a melhor ação registrada na tabela conforme o epsilon decai).
 ### Agente genético (`genetic_agent.py`)
 
 Utiliza um algoritmo genético para otimizar os pesos de uma rede neural de
-uma camada. O cromossomo é representado como um vetor binário de 12.288 bits,
-onde cada peso é codificado com 16 bits em ponto fixo, resultando em 768 pesos
-que formam uma matriz de dimensão (128, 6). O agente recebe os 128 bytes da
+uma camada. O cromossomo é representado como um vetor binário de 6.144 bits,
+onde cada peso é codificado com 16 bits em ponto fixo, resultando em 384 pesos
+que formam uma matriz de dimensão (128, 3). O agente recebe os 128 bytes da
 RAM do Atari, normaliza cada byte dividindo por 255.0 e realiza um produto
-escalar com a matriz de pesos. As 6 saídas resultantes correspondem às ações
-do jogo (`NOOP`, `FIRE`, `RIGHT`, `LEFT`, `FIRE_RIGHT`, `FIRE_LEFT`), sendo
-escolhida a de maior pontuação.
+escalar com a matriz de pesos. As 3 saídas resultantes correspondem, na ordem,
+às ações `FIRE` (1), `FIRE_RIGHT` (4) e `FIRE_LEFT` (5); o índice da maior
+pontuação é convertido para o código real da ação antes de ser enviado ao ambiente.
+Checkpoints anteriores de seis saídas são incompatíveis e exigem um novo treinamento.
 
 O algoritmo genético é executado pelo script `train_genetic.py`, que usa a
 biblioteca DEAP com seleção por roleta, crossover de dois pontos e mutação por

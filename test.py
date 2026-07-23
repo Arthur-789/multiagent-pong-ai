@@ -10,13 +10,62 @@ from agents import LADO_DIREITO, LADO_ESQUERDO, carregar_agente, lados_para_jogo
 from environment import criar_ambiente
 from evaluate import jogar_partida
 from rl_agent import (
-    ACOES_VALIDAS,
+    ACOES_VALIDAS as ACOES_RL,
     AgenteRL,
     NUM_ESTADOS,
     caminho_checkpoint,
     checkpoint_mais_recente,
 )
 from config import FATOR_DESCONTO, TAXA_APRENDIZADO, TAXA_APRENDIZADO_FINAL
+from genetic_agent import (
+    ACOES_VALIDAS as ACOES_GENETICO,
+    BITS_POR_PESO,
+    NUM_ACOES,
+    NUM_ENTRADAS,
+    AgenteGenetico,
+    decodificar_cromossomo,
+)
+
+
+# =====================================================================
+# genetic_agent.py
+# =====================================================================
+class AgenteGeneticoTest(unittest.TestCase):
+    @staticmethod
+    def _cromossomo_com_saida_preferida(indice_saida):
+        pesos = np.zeros((NUM_ENTRADAS, NUM_ACOES), dtype=np.uint16)
+        pesos[:, indice_saida] = 49152  # representa 0.5 em ponto fixo
+        return np.unpackbits(pesos.astype(">u2").view(np.uint8)).tolist()
+
+    def _observacao_em_rally(self):
+        observacao = np.ones(NUM_ENTRADAS, dtype=np.uint8)
+        observacao[49] = 100
+        observacao[54] = 100
+        return observacao
+
+    def test_espaco_de_acoes_e_igual_ao_do_agente_rl(self):
+        self.assertEqual(ACOES_GENETICO, ACOES_RL)
+        self.assertEqual(ACOES_GENETICO, (1, 4, 5))
+
+    def test_cromossomo_de_6144_bits_decodifica_matriz_128_por_3(self):
+        pesos = decodificar_cromossomo([0] * (NUM_ENTRADAS * NUM_ACOES * BITS_POR_PESO))
+
+        self.assertEqual(pesos.shape, (128, 3))
+
+    def test_cada_indice_de_saida_retorna_codigo_real_do_ambiente(self):
+        observacao = self._observacao_em_rally()
+
+        for indice_saida, acao_esperada in enumerate(ACOES_GENETICO):
+            with self.subTest(indice_saida=indice_saida):
+                agente = AgenteGenetico(
+                    self._cromossomo_com_saida_preferida(indice_saida)
+                )
+
+                self.assertEqual(agente.escolher_acao(observacao), acao_esperada)
+
+    def test_rejeita_cromossomo_no_formato_antigo_de_seis_saidas(self):
+        with self.assertRaisesRegex(ValueError, "6144"):
+            AgenteGenetico([0] * (NUM_ENTRADAS * 6 * BITS_POR_PESO))
 
 
 # =====================================================================
@@ -151,7 +200,7 @@ class AgenteRLTest(unittest.TestCase):
         agente = AgenteRL()
         agente.tabela_q[2] = [2.0, 4.0, 6.0]
 
-        agente.treinar_passo(1, ACOES_VALIDAS[1], 3.0, 2, terminou=False)
+        agente.treinar_passo(1, ACOES_RL[1], 3.0, 2, terminou=False)
 
         esperado = TAXA_APRENDIZADO * (3.0 + FATOR_DESCONTO * 6.0)
         self.assertAlmostEqual(float(agente.tabela_q[1, 1]), esperado, places=6)
@@ -162,7 +211,7 @@ class AgenteRLTest(unittest.TestCase):
         agente = AgenteRL()
         agente.tabela_q[2] = 100.0
 
-        agente.treinar_passo(1, ACOES_VALIDAS[0], -10.0, 2, terminou=True)
+        agente.treinar_passo(1, ACOES_RL[0], -10.0, 2, terminou=True)
 
         self.assertAlmostEqual(
             float(agente.tabela_q[1, 0]), TAXA_APRENDIZADO * -10.0, places=6
@@ -170,7 +219,7 @@ class AgenteRLTest(unittest.TestCase):
 
     def test_taxa_de_aprendizado_diminui_com_as_visitas(self):
         agente = AgenteRL()
-        acao = ACOES_VALIDAS[0]
+        acao = ACOES_RL[0]
 
         agente.treinar_passo(1, acao, 10.0, 2, terminou=True)
         primeiro_valor = float(agente.tabela_q[1, 0])
@@ -525,7 +574,7 @@ class EvalAgenteTest(unittest.TestCase):
         # 3 rallies com fitness diferentes: garante que a média é calculada
         avaliar_rally.side_effect = [10.0, -25.0, 5.0]
 
-        individuo = [0] * 12288
+        individuo = [0] * 6144
         resultado = train_genetic.eval_agente(individuo, n_rallies=3, seed_base=100)
 
         # Verifica que cada rally usou uma seed distinta derivada de seed_base
@@ -544,7 +593,7 @@ class EvalAgenteTest(unittest.TestCase):
         criar_env.return_value = Mock()
         avaliar_rally.return_value = 0.0
 
-        resultado = train_genetic.eval_agente([0] * 12288, n_rallies=1)
+        resultado = train_genetic.eval_agente([0] * 6144, n_rallies=1)
 
         self.assertIsInstance(resultado, tuple)
         self.assertEqual(len(resultado), 1)
@@ -557,7 +606,14 @@ class ToolboxConfigTest(unittest.TestCase):
         mutate_func = train_genetic.toolbox.mutate
         indpb = mutate_func.keywords.get("indpb")
         self.assertIsNotNone(indpb)
-        self.assertLess(indpb, 0.001)
+        self.assertEqual(indpb, 1.0 / 12288)
+
+    def test_individuo_usa_tamanho_derivado_do_formato_da_rede(self):
+        import train_genetic
+
+        individuo = train_genetic.toolbox.individual()
+
+        self.assertEqual(len(individuo), NUM_ENTRADAS * NUM_ACOES * BITS_POR_PESO)
 
     def test_selecao_e_roleta_com_fitness_negativo(self):
         import train_genetic
@@ -568,7 +624,7 @@ class ToolboxConfigTest(unittest.TestCase):
 
         populacao = []
         for fitness in (-25.0, 0.0, 25.0):
-            individuo = train_genetic.creator.Individual([0] * 12288)
+            individuo = train_genetic.creator.Individual([0] * 6144)
             individuo.fitness.values = (fitness,)
             populacao.append(individuo)
 

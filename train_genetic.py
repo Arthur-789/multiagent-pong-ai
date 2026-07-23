@@ -3,7 +3,7 @@ import bisect
 import numpy as np
 from deap import base, creator, tools
 
-from genetic_agent import AgenteGenetico
+from genetic_agent import AgenteGenetico, TAMANHO_CROMOSSOMO
 from environment import criar_ambiente
 import heuristic_agent
 from config import (
@@ -125,14 +125,17 @@ creator.create("Individual", list, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
 toolbox.register("attr_bool", random.randint, 0, 1)
-toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, 12288)
+toolbox.register(
+    "individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, TAMANHO_CROMOSSOMO
+)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 toolbox.register("evaluate", eval_agente)
 toolbox.register("mate", tools.cxTwoPoint)
-# indpb=0.01 em 12288 bits gera ~123 flips por individuo mutado
+# indpb=0.01 em 6144 bits gera ~61 flips por individuo mutado
 # flipar o bit mais significativo de um peso muda seu valor quase de -1.0 para +1.0 de uma vez).
-# 1/12288 mantem em media ~1 bit alterado por individuo mutado, uma perturbacao muito mais suave.
+# A configuração por bit de 1/12288 é preservada para isolar o experimento
+# da alteração do espaço de ações.
 toolbox.register("mutate", tools.mutFlipBit, indpb=1.0 / 12288)
 def sel_roleta(populacao, k, epsilon=1e-6):
     """Seleciona ``k`` indivíduos com reposição pela roleta."""

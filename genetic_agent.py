@@ -1,16 +1,28 @@
 import numpy as np
 
+from rl_agent import ACOES_VALIDAS
+
 IDX_BOLA_X = 49
 IDX_BOLA_Y = 54
-FIRE = 1
+FIRE, FIRE_RIGHT, FIRE_LEFT = ACOES_VALIDAS
+
+NUM_ENTRADAS = 128
+NUM_ACOES = len(ACOES_VALIDAS)
+BITS_POR_PESO = 16
+TAMANHO_CROMOSSOMO = NUM_ENTRADAS * NUM_ACOES * BITS_POR_PESO
 
 def decodificar_cromossomo(cromossomo):
-    # Decodifica um cromossomo de 12288 bits em uma matriz de pesos (128, 6).
+    # Decodifica um cromossomo de 6144 bits em uma matriz de pesos (128, 3).
     # Cada peso usa 16 bits (ponto fixo).
     cromossomo_array = np.array(cromossomo, dtype=np.uint8)
+    if cromossomo_array.size != TAMANHO_CROMOSSOMO:
+        raise ValueError(
+            "cromossomo genético incompatível: esperado "
+            f"{TAMANHO_CROMOSSOMO} bits, recebido {cromossomo_array.size}"
+        )
     
-    # Redimensiona para (768, 16)
-    bits_por_peso = cromossomo_array.reshape(768, 16)
+    # Redimensiona para (384, 16)
+    bits_por_peso = cromossomo_array.reshape(NUM_ENTRADAS * NUM_ACOES, BITS_POR_PESO)
     
     # Potências de 2: [2^15, 2^14, ..., 2^0]
     potencias = 1 << np.arange(15, -1, -1)
@@ -21,7 +33,7 @@ def decodificar_cromossomo(cromossomo):
     # Mapeia de [0, 65535] para [-1.0, 1.0)
     pesos_float = (valores_int - 32768) / 32768.0
     
-    return pesos_float.reshape(128, 6)
+    return pesos_float.reshape(NUM_ENTRADAS, NUM_ACOES)
 
 class AgenteGenetico:
     def __init__(self, cromossomo):
@@ -40,11 +52,11 @@ class AgenteGenetico:
         # A observação pode vir como numpy array ou lista de int/uint8
         obs_float = np.array(observacao_ram, dtype=np.float32) / 255.0
         
-        # Produto escalar (1, 128) x (128, 6) = (1, 6)
+        # Produto escalar (1, 128) x (128, 3) = (1, 3)
         scores = np.dot(obs_float, self.pesos)
         
-        return int(np.argmax(scores))
+        indice_acao = int(np.argmax(scores))
+        return ACOES_VALIDAS[indice_acao]
 
     def resetar_estado(self):
         pass
-

@@ -77,7 +77,7 @@ que move a raquete para reduzir a distância vertical até a bola. O RL recebe r
 por aproximar a raquete enquanto a bola vem, recompensa imediata ao rebater,
 uma recompensa muito maior ao marcar e uma punição forte ao sofrer um ponto.
 Pontos sem uma rebatida anterior não geram recompensa gratuita. Os valores
-ficam em `config.py`. Ao final de cada episódio, um checkpoint é salvo em
+ficam em `core/config.py`. Ao final de cada episódio, um checkpoint é salvo em
 `checkpoints_tabular/qtable_episodio_XXXXXX.npz`. A gravação é atômica: um arquivo
 temporário é concluído antes de substituir o destino. Ao aumentar
 `TREINO_EPISODIOS`, o treino retoma automaticamente o checkpoint de maior
@@ -92,7 +92,7 @@ python main.py train genetico
 
 Os hiperparâmetros do algoritmo evolutivo (população, gerações, taxas de
 crossover/mutação, partidas por avaliação e caminho do checkpoint) ficam
-centralizados em **`config.py`**, junto com os demais parâmetros do projeto.
+centralizados em **`core/config.py`**, junto com os demais parâmetros do projeto.
 
 O treinamento do agente genético é feito separadamente, pois utiliza o framework
 DEAP ao invés do loop de treinamento do Q-Learning. O algoritmo genético otimiza
@@ -158,7 +158,7 @@ python main.py eval rl genetico --render
 A flag `--render` abre uma janela visualizando as partidas.
 
 Quando o melhor artefato treinado de um tipo não existe no caminho definido em
-`config.py`, `eval` informa o caminho ausente e orienta a executar
+`core/config.py`, `eval` informa o caminho ausente e orienta a executar
 `python main.py train <tipo>`; nenhum checkpoint alternativo é carregado.
 
 ## Como jogar
@@ -176,7 +176,7 @@ Controles:
 
 No modo jogável, o agente permanece no lado para o qual foi treinado; por isso,
 o humano joga à direita contra o genético e à esquerda contra os demais. A
-execução respeita o limite `FPS_JOGO` definido em `config.py`.
+execução respeita o limite `FPS_JOGO` definido em `core/config.py`.
 Assim como em `eval`, a ausência do melhor artefato treinado produz um erro com
 a instrução de treinamento, sem fallback para outro checkpoint.
 
@@ -185,29 +185,34 @@ a instrução de treinamento, sem fallback para outro checkpoint.
 Todos os parâmetros ajustáveis (número de episódios de treino,
 número de partidas de avaliação, taxa de aprendizado, epsilon,
 população e gerações do algoritmo genético, etc.) estão centralizados
-em **`config.py`**.
+em **`core/config.py`**.
 
 ## Estrutura dos arquivos
 
-| Arquivo             | Responsabilidade                                              |
-|----------------------|-----------------------------------------------------------------|
-| `config.py`          | Configurações do projeto       |
-| `environment.py`     | Criação do ambiente PettingZoo Pong (modo RAM)                |
-| `heuristic_agent.py` | Agente de busca heurística baseado em posições da RAM           |
-| `rl_agent.py`        | Agente de RL: estado discreto, tabela Q, Q-Learning e checkpoints tabulares |
-| `genetic_agent.py`   | Agente genético: decodificação de cromossomo e seleção de ação   |
-| `agents.py`          | Tipos de agente, artefatos padrão e preferências de lado          |
-| `train.py`           | Loop de treinamento do agente de RL                              |
-| `train_genetic.py`   | Treinamento do agente genético via algoritmo evolutivo (DEAP)    |
-| `evaluate.py`        | Compara dois agentes e imprime as estatísticas finais            |
-| `melhor_cromossomo.npy` | Melhor cromossomo encontrado pelo algoritmo genético          |
-| `jogar.py`           | Permite jogar contra qualquer tipo de agente                     |
-| `main.py`            | Única interface de linha de comando do projeto                   |
-| `requirements.txt`   | Dependências do projeto                                          |
+```
+.
+├── main.py                    # Única interface de linha de comando do projeto
+├── core/                      # Configuração, ambiente e orquestração do jogo
+│   ├── config.py              #   Configurações do projeto
+│   ├── environment.py         #   Criação do ambiente PettingZoo Pong (modo RAM)
+│   ├── evaluate.py            #   Compara dois agentes e imprime as estatísticas finais
+│   └── jogar.py               #   Permite jogar contra qualquer tipo de agente
+├── agents/                    # Agentes e catálogo de tipos disponíveis
+│   ├── catalog.py             #   Tipos de agente, artefatos padrão e preferências de lado
+│   ├── heuristic_agent.py     #   Agente de busca heurística baseado em posições da RAM
+│   ├── rl_agent.py            #   Agente de RL: estado discreto, tabela Q, Q-Learning e checkpoints
+│   └── genetic_agent.py       #   Agente genético: decodificação de cromossomo e seleção de ação
+├── train/                     # Scripts de treinamento
+│   ├── train_rl.py            #   Loop de treinamento do agente de RL
+│   └── train_genetic.py       #   Treinamento do agente genético via algoritmo evolutivo (DEAP)
+├── tests/                     # Testes automatizados
+│   └── test_pong.py
+└── requirements.txt           # Dependências do projeto
+```
 
 ## Explicação resumida dos agentes
 
-### Agente heurístico (`heuristic_agent.py`)
+### Agente heurístico (`agents/heuristic_agent.py`)
 
 Lê a posição vertical (Y) da própria raquete e da bola diretamente de
 índices específicos da memória RAM do Atari. A partir dessas posições,
@@ -215,7 +220,7 @@ calcula a diferença de altura e escolhe a ação que alinha a raquete com a bol
 Faz uma busca gulosa simples: se a bola está acima, sobe; se está abaixo, desce;
 se já está alinhada, confirma o saque.
 
-### Agente de RL (`rl_agent.py`)
+### Agente de RL (`agents/rl_agent.py`)
 
 Implementa Q-Learning tabular. O ambiente entrega os 128 bytes da RAM e o
 agente faz feature engineering somente sobre essa percepção. Ele usa a posição
@@ -239,7 +244,7 @@ Durante o treinamento, o agente usa uma política epsilon-greedy
 (explora ações aleatórias no início, e gradualmente passa a usar
 mais a melhor ação registrada na tabela conforme o epsilon decai).
 
-### Agente genético (`genetic_agent.py`)
+### Agente genético (`agents/genetic_agent.py`)
 
 Utiliza um algoritmo genético para otimizar os pesos de uma rede neural de
 uma camada. O cromossomo é representado como um vetor binário de 6.144 bits,
@@ -251,7 +256,7 @@ escalar com a matriz de pesos. As 3 saídas resultantes correspondem, na ordem,
 pontuação é convertido para o código real da ação antes de ser enviado ao ambiente.
 Checkpoints anteriores de seis saídas são incompatíveis e exigem um novo treinamento.
 
-O algoritmo genético é executado pelo script `train_genetic.py`, que usa a
+O algoritmo genético é executado pelo script `train/train_genetic.py`, que usa a
 biblioteca DEAP com seleção por roleta, crossover de dois pontos e mutação por
 flip bit. A avaliação de cada indivíduo é uma partida completa contra o agente
 heurístico, com o mesmo sistema de reward shaping utilizado no treino do agente

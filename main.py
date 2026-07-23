@@ -4,25 +4,25 @@ import argparse
 
 
 def treinar_rl():
-    from train_rl import treinar
+    from train.train_rl import treinar
 
     treinar()
 
 
 def treinar_genetico():
-    from train_genetic import treinar
+    from train.train_genetic import treinar
 
     treinar()
 
 
 def avaliar_agentes(tipo1, tipo2, render=False):
-    from evaluate import avaliar
+    from core.evaluate import avaliar
 
     avaliar(tipo1, tipo2, render=render)
 
 
 def jogar_contra(tipo):
-    from jogar import jogar
+    from core.jogar import jogar
 
     jogar(tipo)
 

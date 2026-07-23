@@ -26,7 +26,7 @@ GA_POP_SIZE = 50  # Tamanho da população
 GA_N_GEN = 200  # Número de gerações
 GA_CXPB = 0.6  # Probabilidade de crossover por par de indivíduos
 GA_MUTPB = 0.3  # Probabilidade de mutação por indivíduo
-GA_RALLIES_POR_AVALIACAO = 5  # Rallies (com seeds diferentes) usados para calcular o fitness de 1 indivíduo
+GA_PARTIDAS_POR_AVALIACAO = 1  # Partidas completas usadas para calcular o fitness de 1 indivíduo
 GA_CAMINHO_CHECKPOINT = "melhor_cromossomo.npy"  # Melhor cromossomo encontrado
 
 # Avaliação

@@ -16,7 +16,12 @@ from rl_agent import (
     caminho_checkpoint,
     checkpoint_mais_recente,
 )
-from config import FATOR_DESCONTO, TAXA_APRENDIZADO, TAXA_APRENDIZADO_FINAL
+from config import (
+    FATOR_DESCONTO,
+    PROBABILIDADE_ACAO_REPETIDA_AVALIACAO,
+    TAXA_APRENDIZADO,
+    TAXA_APRENDIZADO_FINAL,
+)
 from genetic_agent import (
     ACOES_VALIDAS as ACOES_GENETICO,
     BITS_POR_PESO,
@@ -562,38 +567,86 @@ class AvaliarRallyTest(unittest.TestCase):
 
         self.assertEqual(fitness, -25.0)
 
+    def test_avaliar_partida_continua_depois_de_um_ponto(self):
+        import train_genetic
+
+        env = self._ambiente_com_observacoes_genetico(
+            [self._observacao(0, 0)] * 3,
+            recompensas=[0, 1, -1, 0, 1, 0],
+        )
+        agente = Mock()
+        agente.escolher_acao.return_value = 1
+
+        fitness = train_genetic.avaliar_partida(
+            agente, None, "heuristico", env, seed=123
+        )
+
+        self.assertEqual(fitness, 0.0)
+        self.assertEqual(agente.escolher_acao.call_count, 3)
+
+    def test_diagnostico_separa_acoes_rebatidas_e_componentes_do_fitness(self):
+        import train_genetic
+
+        env = self._ambiente_com_observacoes_genetico(
+            [
+                self._observacao(0, 0),
+                self._observacao(100),
+                self._observacao(99),
+                self._observacao(100),
+            ]
+        )
+        agente = Mock()
+        agente.escolher_acao.return_value = 4
+        diagnostico = {}
+
+        fitness = train_genetic.avaliar_rally(
+            agente, None, "heuristico", env, seed=123, diagnostico=diagnostico
+        )
+
+        self.assertEqual(fitness, 5.0)
+        self.assertEqual(diagnostico["acoes"], {1: 0, 4: 4, 5: 0})
+        self.assertEqual(diagnostico["rebatidas"], 1)
+        self.assertEqual(diagnostico["pontos_marcados"], 0)
+        self.assertEqual(diagnostico["pontos_sofridos"], 0)
+        self.assertEqual(diagnostico["fitness_ponto"], 0.0)
+        self.assertEqual(diagnostico["fitness_rebatida"], 5.0)
+        self.assertEqual(diagnostico["fitness_aproximacao"], 0.0)
+
 
 class EvalAgenteTest(unittest.TestCase):
-    @patch("train_genetic.avaliar_rally")
+    @patch("train_genetic.avaliar_partida")
     @patch("train_genetic.criar_ambiente")
-    def test_eval_agente_usa_multiplos_rallies_com_seeds_distintas(self, criar_env, avaliar_rally):
+    def test_eval_agente_usa_partidas_com_seeds_distintas(self, criar_env, avaliar_partida):
         import train_genetic
 
         env = Mock()
         criar_env.return_value = env
-        # 3 rallies com fitness diferentes: garante que a média é calculada
-        avaliar_rally.side_effect = [10.0, -25.0, 5.0]
+        # 3 partidas com fitness diferentes: garante que a média é calculada
+        avaliar_partida.side_effect = [10.0, -25.0, 5.0]
 
         individuo = [0] * 6144
-        resultado = train_genetic.eval_agente(individuo, n_rallies=3, seed_base=100)
+        resultado = train_genetic.eval_agente(individuo, n_partidas=3, seed_base=100)
 
-        # Verifica que cada rally usou uma seed distinta derivada de seed_base
-        seeds_usadas = [chamada.kwargs["seed"] for chamada in avaliar_rally.call_args_list]
+        # Verifica que cada partida usou uma seed distinta derivada de seed_base
+        seeds_usadas = [chamada.kwargs["seed"] for chamada in avaliar_partida.call_args_list]
         self.assertEqual(seeds_usadas, [100, 101, 102])
 
         media_esperada = (10.0 - 25.0 + 5.0) / 3
         self.assertAlmostEqual(resultado[0], media_esperada)
+        criar_env.assert_called_once_with(
+            probabilidade_acao_repetida=PROBABILIDADE_ACAO_REPETIDA_AVALIACAO
+        )
         env.close.assert_called_once_with()
 
-    @patch("train_genetic.avaliar_rally")
+    @patch("train_genetic.avaliar_partida")
     @patch("train_genetic.criar_ambiente")
-    def test_eval_agente_retorna_tupla_para_deap(self, criar_env, avaliar_rally):
+    def test_eval_agente_retorna_tupla_para_deap(self, criar_env, avaliar_partida):
         import train_genetic
 
         criar_env.return_value = Mock()
-        avaliar_rally.return_value = 0.0
+        avaliar_partida.return_value = 0.0
 
-        resultado = train_genetic.eval_agente([0] * 6144, n_rallies=1)
+        resultado = train_genetic.eval_agente([0] * 6144, n_partidas=1)
 
         self.assertIsInstance(resultado, tuple)
         self.assertEqual(len(resultado), 1)
@@ -606,7 +659,7 @@ class ToolboxConfigTest(unittest.TestCase):
         mutate_func = train_genetic.toolbox.mutate
         indpb = mutate_func.keywords.get("indpb")
         self.assertIsNotNone(indpb)
-        self.assertEqual(indpb, 1.0 / 12288)
+        self.assertEqual(indpb, 4.0 / 6144)
 
     def test_individuo_usa_tamanho_derivado_do_formato_da_rede(self):
         import train_genetic

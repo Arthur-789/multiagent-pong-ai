@@ -91,17 +91,16 @@ python main.py train genetico
 ```
 
 Os hiperparâmetros do algoritmo evolutivo (população, gerações, taxas de
-crossover/mutação, rallies por avaliação e caminho do checkpoint) ficam
+crossover/mutação, partidas por avaliação e caminho do checkpoint) ficam
 centralizados em **`config.py`**, junto com os demais parâmetros do projeto.
 
 O treinamento do agente genético é feito separadamente, pois utiliza o framework
 DEAP ao invés do loop de treinamento do Q-Learning. O algoritmo genético otimiza
 um cromossomo binário de 6.144 bits que codifica uma rede neural de uma camada.
-Cada indivíduo da população é avaliado contra o agente heurístico em vários rallies
-com seeds diferentes, recebendo as mesmas recompensas do agente de RL, e o fitness
-final é a média entre esses rallies. Usar várias seeds evita que o ambiente
-reproduza sempre o mesmo cenário inicial, o que tornaria os indivíduos
-indistinguíveis entre si. Como o fitness pode ser negativo, a roleta calcula
+Cada indivíduo da população é avaliado contra o agente heurístico em uma partida
+completa. Assim, o Fitness inclui os estados após cada ponto, como o placar e os
+saques seguintes, e a repetição de ação é igual à da avaliação final. Como o
+fitness pode ser negativo, a roleta calcula
 pesos positivos apenas durante a seleção: subtrai o menor fitness da população
 e soma um epsilon mínimo (`1e-6`). O fitness armazenado e exibido continua
 sendo o valor real.
@@ -110,9 +109,9 @@ O treinamento usa os seguintes parâmetros do algoritmo evolutivo:
 
 - **População**: 50 indivíduos (padrão)
 - **Gerações**: 200 (padrão)
-- **Avaliação**: 5 rallies por indivíduo (média), cada um com uma seed diferente
+- **Avaliação**: 1 partida completa por indivíduo (média), com a mesma repetição de ação da avaliação final
 - **Crossover**: dois pontos (taxa de 60% por padrão)
-- **Mutação**: flip bit com probabilidade de ~1/12288 por bit (~0,5 bit esperado por indivíduo mutado), taxa de 30% por indivíduo (padrão)
+- **Mutação**: flip bit com probabilidade de ~4/6144 por bit (~4 bits esperados por indivíduo mutado), taxa de 30% por indivíduo (padrão)
 - **Seleção**: roleta, com pesos obtidos pelo deslocamento do menor fitness da
   população e epsilon `1e-6`
 - **Elitismo**: o melhor indivíduo (HallOfFame) é preservado e reinserido na população caso toda a geração seguinte regrida
@@ -254,7 +253,7 @@ Checkpoints anteriores de seis saídas são incompatíveis e exigem um novo trei
 
 O algoritmo genético é executado pelo script `train_genetic.py`, que usa a
 biblioteca DEAP com seleção por roleta, crossover de dois pontos e mutação por
-flip bit. A avaliação de cada indivíduo é a média de vários rallies (com seeds
-diferentes) contra o agente heurístico, com o mesmo sistema de reward shaping
-utilizado no treino do agente de RL. O melhor cromossomo encontrado é salvo em
+flip bit. A avaliação de cada indivíduo é uma partida completa contra o agente
+heurístico, com o mesmo sistema de reward shaping utilizado no treino do agente
+de RL. O melhor cromossomo encontrado é salvo em
 `melhor_cromossomo.npy` a cada geração.
